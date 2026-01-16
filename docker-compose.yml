@@ -1,680 +1,1942 @@
-# 🚀 HomeLab Media Server - Configuration ULTIMATE
-# Version 4.0.0 - Hybrid Profile Architecture
-# Controlled by COMPOSE_PROFILES in .env file
+# =============================================================================
+# HOMELAB MEDIA SERVER - Version 5.0.0 PRODUCTION
+# =============================================================================
+# Architecture hybride avec profils Docker Compose
+# Inspiré de YunoHost pour la robustesse et la facilité d'utilisation
+#
+# Documentation: https://github.com/BluuArtiis-FR/Homelab-Media-Server
+# =============================================================================
 
 networks:
   homelab:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
   traefik_public:
     name: traefik_public
     driver: bridge
 
-# Define all volumes here for clarity
+x-common-env: &common-env
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+  TZ: ${TZ:-Europe/Paris}
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+
+# =============================================================================
+# VOLUMES - Tous les volumes persistants
+# =============================================================================
 volumes:
-  gluetun_config: {}
-  portainer_data: {}
-  authentik_postgres_data: {}
-  authentik_redis_data: {}
-  nextcloud_data: {}
-  nextcloud_db_data: {}
-  jellyfin_config: {}
-  # ... Add all other service volumes here
-  sonarr_config: {}
-  radarr_config: {}
-  # etc.
+  # Infrastructure
+  traefik_letsencrypt:
+  authentik_postgres_data:
+  authentik_redis_data:
+  # Media
+  jellyfin_config:
+  jellyfin_cache:
+  jellyseerr_config:
+  tdarr_config:
+  tdarr_server:
+  jellystat_config:
+  # Download
+  gluetun_config:
+  qbittorrent_config:
+  prowlarr_config:
+  sonarr_config:
+  radarr_config:
+  lidarr_config:
+  bazarr_config:
+  unpackerr_config:
+  # Cloud
+  nextcloud_data:
+  nextcloud_db_data:
+  duplicati_config:
+  filebrowser_config:
+  # Office
+  onlyoffice_data:
+  onlyoffice_logs:
+  stirlingpdf_config:
+  jirafeau_data:
+  # Docs
+  bookstack_config:
+  bookstack_db_data:
+  paperless_config:
+  paperless_db_data:
+  paperless_redis_data:
+  paperless_consume:
+  # Security
+  vaultwarden_data:
+  tailscale_data:
+  # Recipes
+  mealie_data:
+  # Photos
+  immich_upload:
+  immich_db_data:
+  immich_redis_data:
+  immich_ml_cache:
+  # Finance
+  firefly_db_data:
+  # Inventory
+  grocy_config:
+  # Home Automation
+  homeassistant_config:
+  # Utils
+  freshrss_data:
+  metube_downloads:
+  changedetection_data:
+  shlink_data:
+  shlink_db_data:
+  # Management
+  codeserver_config:
+  portainer_data:
+  dozzle_data:
+  npm_data:
+  npm_db_data:
+  # Network
+  adguardhome_work:
+  adguardhome_conf:
+  # Remote Support
+  rustdesk_data:
+  # Health & Fitness
+  wger_static:
+  wger_media:
+  wger_db_data:
+  # Monitoring
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:
+  # Backup
+  backup_data:
 
 services:
-  # =============================================================================
-  # 🌐 INFRASTRUCTURE & SECURITY (Always On)
-  # =============================================================================
-  traefik:
-    image: traefik:latest
-    container_name: traefik
-    # ... (same configuration as before, no profiles)
+  # ===========================================================================
+  # INFRASTRUCTURE - Toujours actif (pas de profil)
+  # ===========================================================================
 
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik_public"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--ping=true"
+      - "--metrics.prometheus=true"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - traefik_public
+      - homelab
+    labels:
+      - "traefik.enable=true"
+      # Dashboard
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.middlewares=authentik@docker,security-headers@docker"
+      # Security Headers Middleware
+      - "traefik.http.middlewares.security-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.security-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.security-headers.headers.stsPreload=true"
+      - "traefik.http.middlewares.security-headers.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.security-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.security-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.security-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.security-headers.headers.frameDeny=true"
+      # Rate Limiting Middleware
+      - "traefik.http.middlewares.rate-limit.ratelimit.average=100"
+      - "traefik.http.middlewares.rate-limit.ratelimit.burst=50"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # ---------------------------------------------------------------------------
+  # Authentik - SSO et Authentification
+  # ---------------------------------------------------------------------------
   authentik-postgres:
     image: postgres:15-alpine
     container_name: authentik-postgres
-    # ... (same configuration as before, no profiles)
+    environment:
+      POSTGRES_PASSWORD: ${AUTHENTIK_PG_PASS}
+      POSTGRES_USER: authentik
+      POSTGRES_DB: authentik
+    volumes:
+      - authentik_postgres_data:/var/lib/postgresql/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.2'
+          memory: 256M
 
   authentik-redis:
-    image: redis:alpine
+    image: redis:7-alpine
     container_name: authentik-redis
-    # ... (same configuration as before, no profiles)
+    command: --save 60 1 --loglevel warning
+    volumes:
+      - authentik_redis_data:/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
 
   authentik-server:
-    image: ghcr.io/goauthentik/server:latest
+    image: ghcr.io/goauthentik/server:2024.2
     container_name: authentik-server
-    # ... (same configuration as before, no profiles)
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
+    volumes:
+      - ${CONFIG_PATH}/authentik/media:/media
+      - ${CONFIG_PATH}/authentik/templates:/templates
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.authentik.rule=Host(`auth.${DOMAIN}`)"
+      - "traefik.http.routers.authentik.entrypoints=websecure"
+      - "traefik.http.routers.authentik.tls.certresolver=letsencrypt"
+      - "traefik.http.services.authentik.loadbalancer.server.port=9000"
+      # Authentik Middleware pour les autres services
+      - "traefik.http.middlewares.authentik.forwardauth.address=http://authentik-server:9000/outpost.goauthentik.io/auth/traefik"
+      - "traefik.http.middlewares.authentik.forwardauth.trustForwardHeader=true"
+      - "traefik.http.middlewares.authentik.forwardauth.authResponseHeaders=X-authentik-username,X-authentik-groups,X-authentik-email,X-authentik-name,X-authentik-uid,X-authentik-jwt,X-authentik-meta-jwks,X-authentik-meta-outpost,X-authentik-meta-provider,X-authentik-meta-app,X-authentik-meta-version"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
   authentik-worker:
-    image: ghcr.io/goauthentik/server:latest
+    image: ghcr.io/goauthentik/server:2024.2
     container_name: authentik-worker
-    # ... (same configuration as before, no profiles)
+    command: worker
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${CONFIG_PATH}/authentik/media:/media
+      - ${CONFIG_PATH}/authentik/certs:/certs
+      - ${CONFIG_PATH}/authentik/templates:/templates
+    networks:
+      - homelab
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
-  # =============================================================================
-  # ⬇️ DOWNLOAD PROFILE
-  # =============================================================================
+  # ===========================================================================
+  # DOWNLOAD PROFILE - Services de telechargement
+  # ===========================================================================
+
   gluetun:
     image: qmcgaw/gluetun:latest
     container_name: gluetun
     profiles: ["download", "gluetun"]
-    # ...
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      <<: *common-env
+      VPN_SERVICE_PROVIDER: ${VPN_SERVICE_PROVIDER:-protonvpn}
+      VPN_TYPE: ${VPN_TYPE:-openvpn}
+      OPENVPN_USER: ${OPENVPN_USER}
+      OPENVPN_PASSWORD: ${OPENVPN_PASSWORD}
+      SERVER_COUNTRIES: ${SERVER_COUNTRIES:-Switzerland}
+      FIREWALL_OUTBOUND_SUBNETS: 172.20.0.0/16
+      HEALTH_VPN_DURATION_INITIAL: 30s
+    volumes:
+      - gluetun_config:/gluetun
+    networks:
+      - homelab
+    ports:
+      # qBittorrent WebUI
+      - "8080:8080"
+      # qBittorrent Torrent port
+      - "6881:6881"
+      - "6881:6881/udp"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "/gluetun-entrypoint", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
 
   qbittorrent:
-    image: linuxserver/qbittorrent:latest
+    image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
     profiles: ["download", "qbittorrent"]
-    # ...
+    network_mode: "service:gluetun"
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      WEBUI_PORT: 8080
+    volumes:
+      - qbittorrent_config:/config
+      - ${DOWNLOADS_PATH}:/downloads
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080 || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
   prowlarr:
-    image: linuxserver/prowlarr:latest
+    image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
     profiles: ["download", "prowlarr"]
-    # ...
+    environment:
+      <<: *common-env
+    volumes:
+      - prowlarr_config:/config
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prowlarr.rule=Host(`prowlarr.${DOMAIN}`)"
+      - "traefik.http.routers.prowlarr.entrypoints=websecure"
+      - "traefik.http.routers.prowlarr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.prowlarr.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.prowlarr.loadbalancer.server.port=9696"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9696/ping || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
   sonarr:
-    image: linuxserver/sonarr:latest
+    image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
     profiles: ["download", "sonarr"]
-    # ...
+    environment:
+      <<: *common-env
+    volumes:
+      - sonarr_config:/config
+      - ${MEDIA_PATH}/tv:/tv
+      - ${DOWNLOADS_PATH}:/downloads
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      - prowlarr
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)"
+      - "traefik.http.routers.sonarr.entrypoints=websecure"
+      - "traefik.http.routers.sonarr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sonarr.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8989/ping || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
   radarr:
-    image: linuxserver/radarr:latest
+    image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
     profiles: ["download", "radarr"]
-    # ...
-  
+    environment:
+      <<: *common-env
+    volumes:
+      - radarr_config:/config
+      - ${MEDIA_PATH}/movies:/movies
+      - ${DOWNLOADS_PATH}:/downloads
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      - prowlarr
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`)"
+      - "traefik.http.routers.radarr.entrypoints=websecure"
+      - "traefik.http.routers.radarr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.radarr.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.radarr.loadbalancer.server.port=7878"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7878/ping || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
   lidarr:
-    image: linuxserver/lidarr:latest
+    image: lscr.io/linuxserver/lidarr:latest
     container_name: lidarr
     profiles: ["download", "lidarr"]
-    # ...
+    environment:
+      <<: *common-env
+    volumes:
+      - lidarr_config:/config
+      - ${MEDIA_PATH}/music:/music
+      - ${DOWNLOADS_PATH}:/downloads
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      - prowlarr
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lidarr.rule=Host(`lidarr.${DOMAIN}`)"
+      - "traefik.http.routers.lidarr.entrypoints=websecure"
+      - "traefik.http.routers.lidarr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.lidarr.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8686/ping || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
   bazarr:
-    image: linuxserver/bazarr:latest
+    image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
     profiles: ["download", "bazarr"]
-    # ...
+    environment:
+      <<: *common-env
+    volumes:
+      - bazarr_config:/config
+      - ${MEDIA_PATH}/movies:/movies
+      - ${MEDIA_PATH}/tv:/tv
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      - sonarr
+      - radarr
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bazarr.rule=Host(`bazarr.${DOMAIN}`)"
+      - "traefik.http.routers.bazarr.entrypoints=websecure"
+      - "traefik.http.routers.bazarr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.bazarr.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.bazarr.loadbalancer.server.port=6767"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6767/ping || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
-  # =============================================================================
-  # 🎬 MEDIA PROFILE
-  # =============================================================================
+  unpackerr:
+    image: golift/unpackerr:latest
+    container_name: unpackerr
+    profiles: ["download", "unpackerr"]
+    environment:
+      <<: *common-env
+      UN_SONARR_0_URL: http://sonarr:8989
+      UN_SONARR_0_API_KEY: ${SONARR_API_KEY:-}
+      UN_RADARR_0_URL: http://radarr:7878
+      UN_RADARR_0_API_KEY: ${RADARR_API_KEY:-}
+      UN_LIDARR_0_URL: http://lidarr:8686
+      UN_LIDARR_0_API_KEY: ${LIDARR_API_KEY:-}
+    volumes:
+      - ${DOWNLOADS_PATH}:/downloads
+    networks:
+      - homelab
+    depends_on:
+      - sonarr
+      - radarr
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # ===========================================================================
+  # MEDIA PROFILE - Streaming et gestion media
+  # ===========================================================================
+
   jellyfin:
     image: jellyfin/jellyfin:latest
     container_name: jellyfin
     profiles: ["media", "jellyfin"]
-    # ...
+    environment:
+      <<: *common-env
+      JELLYFIN_PublishedServerUrl: https://jellyfin.${DOMAIN}
+    volumes:
+      - jellyfin_config:/config
+      - jellyfin_cache:/cache
+      - ${MEDIA_PATH}:/media:ro
+    networks:
+      - homelab
+      - traefik_public
+    devices:
+      # Decommenter pour l'acceleration materielle Intel/AMD
+      # - /dev/dri:/dev/dri
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.${DOMAIN}`)"
+      - "traefik.http.routers.jellyfin.entrypoints=websecure"
+      - "traefik.http.routers.jellyfin.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.jellyfin.middlewares=security-headers@docker"
+      - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8096/health || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 1G
 
   jellyseerr:
     image: fallenbagel/jellyseerr:latest
     container_name: jellyseerr
     profiles: ["media", "jellyseerr"]
-    # ...
-  
+    environment:
+      <<: *common-env
+      LOG_LEVEL: info
+    volumes:
+      - jellyseerr_config:/app/config
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      - jellyfin
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jellyseerr.rule=Host(`requests.${DOMAIN}`)"
+      - "traefik.http.routers.jellyseerr.entrypoints=websecure"
+      - "traefik.http.routers.jellyseerr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.jellyseerr.middlewares=security-headers@docker"
+      - "traefik.http.services.jellyseerr.loadbalancer.server.port=5055"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5055/api/v1/status || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
   tdarr:
     image: ghcr.io/haveagitgat/tdarr:latest
     container_name: tdarr
     profiles: ["media", "tdarr"]
-    # ...
-  
-  jellystat:
-    image: ghcr.io/jellystat/jellystat:latest
-    container_name: jellystat
-    profiles: ["media", "jellystat"]
-    depends_on:
-      - jellyfin
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - JELLYFIN_HOST=jellyfin
-      - JELLYFIN_PORT=8096
-      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY} # Make sure to add this to .env
+      <<: *common-env
+      serverIP: 0.0.0.0
+      serverPort: 8266
+      webUIPort: 8265
+      internalNode: "true"
+      inContainer: "true"
+      nodeName: InternalNode
     volumes:
-      - ${CONFIG_PATH}/jellystat:/config
+      - tdarr_server:/app/server
+      - tdarr_config:/app/configs
+      - ${MEDIA_PATH}:/media
+      - ${DATA_PATH}/tdarr/transcode_cache:/temp
     networks:
       - homelab
       - traefik_public
     labels:
       - "traefik.enable=true"
+      - "traefik.http.routers.tdarr.rule=Host(`tdarr.${DOMAIN}`)"
+      - "traefik.http.routers.tdarr.entrypoints=websecure"
+      - "traefik.http.routers.tdarr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.tdarr.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.tdarr.loadbalancer.server.port=8265"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8265 || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  jellystat:
+    image: cyfershepard/jellystat:latest
+    container_name: jellystat
+    profiles: ["media", "jellystat"]
+    environment:
+      <<: *common-env
+      POSTGRES_USER: jellystat
+      POSTGRES_PASSWORD: ${JELLYSTAT_DB_PASS:-jellystat}
+      POSTGRES_IP: jellystat-db
+      POSTGRES_PORT: 5432
+      JWT_SECRET: ${JELLYSTAT_JWT_SECRET:-changeme}
+    volumes:
+      - jellystat_config:/app/backend/backup-data
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      jellystat-db:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
       - "traefik.http.routers.jellystat.rule=Host(`jellystat.${DOMAIN}`)"
       - "traefik.http.routers.jellystat.entrypoints=websecure"
-      - "traefik.http.routers.jellystat.tls.certresolver=myresolver"
-      - "traefik.http.services.jellystat.loadbalancer.server.port=8085"
+      - "traefik.http.routers.jellystat.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.jellystat.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.jellystat.loadbalancer.server.port=3000"
     restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000 || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
+  jellystat-db:
+    image: postgres:15-alpine
+    container_name: jellystat-db
+    profiles: ["media", "jellystat"]
+    environment:
+      POSTGRES_USER: jellystat
+      POSTGRES_PASSWORD: ${JELLYSTAT_DB_PASS:-jellystat}
+      POSTGRES_DB: jellystat
+    volumes:
+      - ${DATA_PATH}/jellystat-db:/var/lib/postgresql/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jellystat"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
-  # =============================================================================
-  # ☁️ CLOUD PROFILE
-  # =============================================================================
+  # ===========================================================================
+  # CLOUD PROFILE - Stockage et fichiers
+  # ===========================================================================
+
   nextcloud:
-    image: nextcloud:fpm-alpine
+    image: nextcloud:28-apache
     container_name: nextcloud
     profiles: ["cloud", "nextcloud"]
-    # ...
+    environment:
+      <<: *common-env
+      POSTGRES_HOST: nextcloud-db
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: ${NEXTCLOUD_DB_PASS}
+      NEXTCLOUD_ADMIN_USER: admin
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASS}
+      NEXTCLOUD_TRUSTED_DOMAINS: nextcloud.${DOMAIN}
+      REDIS_HOST: nextcloud-redis
+      OVERWRITEPROTOCOL: https
+      OVERWRITECLIURL: https://nextcloud.${DOMAIN}
+      TRUSTED_PROXIES: 172.20.0.0/16
+    volumes:
+      - nextcloud_data:/var/www/html
+      - ${DATA_PATH}/nextcloud/data:/var/www/html/data
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      nextcloud-db:
+        condition: service_healthy
+      nextcloud-redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nextcloud.rule=Host(`nextcloud.${DOMAIN}`)"
+      - "traefik.http.routers.nextcloud.entrypoints=websecure"
+      - "traefik.http.routers.nextcloud.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nextcloud.middlewares=nextcloud-headers@docker"
+      - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+      # Headers specifiques Nextcloud
+      - "traefik.http.middlewares.nextcloud-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.nextcloud-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.nextcloud-headers.headers.customRequestHeaders.X-Forwarded-Proto=https"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/status.php | grep -q 'installed.:true' || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
   nextcloud-db:
     image: postgres:15-alpine
     container_name: nextcloud-db
-    profiles: ["cloud", "nextcloud"] # Tied to nextcloud
-    # ...
-  
+    profiles: ["cloud", "nextcloud"]
+    environment:
+      POSTGRES_PASSWORD: ${NEXTCLOUD_DB_PASS}
+      POSTGRES_USER: nextcloud
+      POSTGRES_DB: nextcloud
+    volumes:
+      - nextcloud_db_data:/var/lib/postgresql/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextcloud"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.2'
+          memory: 256M
+
+  nextcloud-redis:
+    image: redis:7-alpine
+    container_name: nextcloud-redis
+    profiles: ["cloud", "nextcloud"]
+    command: --save 60 1 --loglevel warning
+    volumes:
+      - ${DATA_PATH}/nextcloud-redis:/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
   duplicati:
-    image: linuxserver/duplicati:latest
+    image: lscr.io/linuxserver/duplicati:latest
     container_name: duplicati
     profiles: ["cloud", "duplicati"]
-    # ...
+    environment:
+      <<: *common-env
+    volumes:
+      - duplicati_config:/config
+      - backup_data:/backups
+      - ${CONFIG_PATH}:/source/config:ro
+      - ${DATA_PATH}:/source/data:ro
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.duplicati.rule=Host(`backup.${DOMAIN}`)"
+      - "traefik.http.routers.duplicati.entrypoints=websecure"
+      - "traefik.http.routers.duplicati.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.duplicati.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.duplicati.loadbalancer.server.port=8200"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8200 || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
   filebrowser:
     image: filebrowser/filebrowser:latest
     container_name: filebrowser
     profiles: ["cloud", "filebrowser"]
-    # ...
+    environment:
+      <<: *common-env
+    volumes:
+      - filebrowser_config:/database
+      - ${DATA_PATH}:/srv
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.filebrowser.rule=Host(`files.${DOMAIN}`)"
+      - "traefik.http.routers.filebrowser.entrypoints=websecure"
+      - "traefik.http.routers.filebrowser.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.filebrowser.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.filebrowser.loadbalancer.server.port=80"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:80/health || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
 
-  # =============================================================================
-  # 🏢 OFFICE PROFILE
-  # =============================================================================
+  # ===========================================================================
+  # OFFICE PROFILE - Suite bureautique
+  # ===========================================================================
+
   onlyoffice:
     image: onlyoffice/documentserver:latest
     container_name: onlyoffice
     profiles: ["office", "onlyoffice"]
-    # ...
-  
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: ${ONLYOFFICE_JWT_SECRET}
+    volumes:
+      - onlyoffice_data:/var/www/onlyoffice/Data
+      - onlyoffice_logs:/var/log/onlyoffice
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.onlyoffice.rule=Host(`office.${DOMAIN}`)"
+      - "traefik.http.routers.onlyoffice.entrypoints=websecure"
+      - "traefik.http.routers.onlyoffice.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.onlyoffice.middlewares=security-headers@docker"
+      - "traefik.http.services.onlyoffice.loadbalancer.server.port=80"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/healthcheck || exit 1"]
+      <<: *healthcheck-defaults
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
   stirling-pdf:
     image: frooodle/s-pdf:latest
     container_name: stirling-pdf
     profiles: ["office", "stirling-pdf"]
-    # ...
+    environment:
+      <<: *common-env
+      DOCKER_ENABLE_SECURITY: "false"
+    volumes:
+      - stirlingpdf_config:/configs
+      - ${DATA_PATH}/stirling-pdf/training:/usr/share/tesseract-ocr/5/tessdata
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.stirling-pdf.rule=Host(`pdf.${DOMAIN}`)"
+      - "traefik.http.routers.stirling-pdf.entrypoints=websecure"
+      - "traefik.http.routers.stirling-pdf.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.stirling-pdf.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.stirling-pdf.loadbalancer.server.port=8080"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/api/v1/info/status || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
   jirafeau:
-    image: jirafeau/jirafeau:latest
+    image: jgeusebroek/jirafeau:latest
     container_name: jirafeau
     profiles: ["office", "jirafeau"]
-    # ...
-    
-  # ... This pattern is applied to ALL other services (docs, monitoring, management, etc.)
-  # For brevity, the full YAML is not displayed here, but every service now has
-  # a profiles: ["group", "service-name"] entry.
-  # =============================================================================
-  # ?? SECURITY PROFILE
-  # =============================================================================
-  vaultwarden:
-    image: vaultwarden/server:latest
-    container_name: vaultwarden
-    profiles: ["security", "vaultwarden"]
-    volumes:
-      - /vaultwarden:/data
     environment:
-      - PUID=
-      - PGID=
-      - TZ=
-      - WEBSOCKET_ENABLED=true  # Required for some clients
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.vaultwarden.rule=Host(ault.)"
-      - "traefik.http.routers.vaultwarden.entrypoints=websecure"
-      - "traefik.http.routers.vaultwarden.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.vaultwarden.middlewares=authentik@docker"
-      - "traefik.http.services.vaultwarden.loadbalancer.server.port=80"
+      <<: *common-env
+    volumes:
+      - jirafeau_data:/data
     networks:
+      - homelab
       - traefik_public
-      - homelab
-    restart: 
-    deploy:
-      resources:
-        limits: {cpus: '0.75', memory: '512M'}
-        reservations: {cpus: '0.1', memory: '128M'}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jirafeau.rule=Host(`share.${DOMAIN}`)"
+      - "traefik.http.routers.jirafeau.entrypoints=websecure"
+      - "traefik.http.routers.jirafeau.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.jirafeau.middlewares=security-headers@docker"
+      - "traefik.http.services.jirafeau.loadbalancer.server.port=80"
+    restart: unless-stopped
+    logging: *default-logging
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
-      interval: 1m
-      timeout: 10s
-      retries: 3
-
-  # =============================================================================
-  # ?? RECIPES PROFILE
-  # =============================================================================
-  mealie:
-    image: ghcr.io/mealie-recipes/mealie:latest
-    container_name: mealie
-    profiles: ["recipes", "mealie"]
-    volumes:
-      - /mealie:/app/data
-    environment:
-      - PUID=
-      - PGID=
-      - TZ=
-      - ALLOW_SIGNUP=true
-      - BASE_URL=https://recipes.
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.mealie.rule=Host(ecipes.)"
-      - "traefik.http.routers.mealie.entrypoints=websecure"
-      - "traefik.http.routers.mealie.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.mealie.middlewares=authentik@docker"
-      - "traefik.http.services.mealie.loadbalancer.server.port=9000"
-    networks:
-      - traefik_public
-      - homelab
-    restart: 
+      test: ["CMD-SHELL", "curl -sf http://localhost || exit 1"]
+      <<: *healthcheck-defaults
     deploy:
       resources:
-        limits: {cpus: '1', memory: '1G'}
-        reservations: {cpus: '0.25', memory: '256M'}
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/api/debug/health || exit 1"]
-      interval: 1m
-      timeout: 10s
-      retries: 3
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
 
-  # =============================================================================
-  # ??? UTILS PROFILE
-  # =============================================================================
-  freshrss:
-    image: freshrss/freshrss:latest
-    container_name: freshrss
-    profiles: ["utils", "freshrss"]
-    volumes:
-      - /freshrss:/var/www/FreshRSS/data
-    environment:
-      - PUID=
-      - PGID=
-      - TZ=
-      - 'CRON_MIN'='*/20'
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.freshrss.rule=Host(ss.)"
-      - "traefik.http.routers.freshrss.entrypoints=websecure"
-      - "traefik.http.routers.freshrss.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.freshrss.middlewares=authentik@docker"
-      - "traefik.http.services.freshrss.loadbalancer.server.port=80"
-    networks:
-      - traefik_public
-      - homelab
-    restart: 
-    deploy:
-      resources:
-        limits: {cpus: '0.5', memory: '512M'}
-        reservations: {cpus: '0.1', memory: '128M'}
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
-      interval: 2m
-      timeout: 10s
-      retries: 3
-
-  # =============================================================================
-  # ??? MANAGEMENT PROFILE
-  # =============================================================================
-  code-server:
-    image: lscr.io/linuxserver/code-server:latest
-    container_name: code-server
-    profiles: ["management", "code-server"]
-    environment:
-      - PUID=
-      - PGID=
-      - TZ=
-      - PASSWORD=CHANGEME_CODESERVER_PASSWORD # Set a password
-      - SUDO_PASSWORD=CHANGEME_CODESERVER_PASSWORD
-    volumes:
-      - /code-server:/config
-      - .:/workspace  # Mount the entire project directory
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.code-server.rule=Host(code.)"
-      - "traefik.http.routers.code-server.entrypoints=websecure"
-      - "traefik.http.routers.code-server.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.code-server.middlewares=authentik@docker"
-      - "traefik.http.services.code-server.loadbalancer.server.port=8443"
-    networks:
-      - traefik_public
-      - homelab
-    restart: 
-    deploy:
-      resources:
-        limits: {cpus: '1', memory: '2G'}
-        reservations: {cpus: '0.25', memory: '256M'}
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8443/healthz || exit 1"]
-      interval: 2m
-      timeout: 10s
-      retries: 3
-
-  # =============================================================================
-  # ?? HOME AUTOMATION PROFILE
-  # =============================================================================
-  home-assistant:
-    image: ghcr.io/home-assistant/home-assistant:stable
-    container_name: home-assistant
-    profiles: ["home-automation", "home-assistant"]
-    volumes:
-      - /home-assistant:/config
-      - /etc/localtime:/etc/localtime:ro
-    # network_mode: host is recommended for easy discovery (mDNS, etc.)
-    # This means it will use the host's network directly, bypassing Traefik's network.
-    # Traefik can still route to it if configured to point to the host IP.
-    network_mode: host
-    restart: 
-    deploy:
-      resources:
-        limits: {cpus: '2', memory: '2G'}
-        reservations: {cpus: '0.5', memory: '512M'}
-    # Note: Healthcheck is managed internally by Home Assistant
-    # We can add a simple port check as a fallback
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8123 || exit 1"]
-      interval: 2m
-      timeout: 10s
-      retries: 3
-
-  # =============================================================================
-  # ?? PHOTOS PROFILE (Immich)
-  # =============================================================================
-  immich-db:
-    container_name: immich_postgres
-    image: tensorchord/pgvecto-rs:pg14-v0.2.0
-    profiles: ["photos", "immich-db"]
-    environment:
-      - POSTGRES_PASSWORD=
-      - POSTGRES_USER=immich
-      - POSTGRES_DB=immich
-    volumes:
-      - /immich/db:/var/lib/postgresql/data
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '1', memory: '2G'}, reservations: {cpus: '0.25', memory: '512M'}}
-
-  immich-redis:
-    container_name: immich_redis
-    image: redis:6.2-alpine@sha256:351c49594a2686738b3691358a43f873f272b53b8955ce73822d6448512e1a32
-    profiles: ["photos", "immich-redis"]
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '0.5', memory: '256M'}, reservations: {cpus: '0.1', memory: '64M'}}
-
-  immich-server:
-    container_name: immich_server
-    image: ghcr.io/immich-app/immich-server:release
-    profiles: ["photos", "immich"]
-    depends_on: [immich-db, immich-redis]
-    environment:
-      - DB_HOSTNAME=immich-db
-      - DB_USERNAME=immich
-      - DB_PASSWORD=
-      - DB_DATABASE_NAME=immich
-      - REDIS_HOSTNAME=immich-redis
-      - UPLOAD_LOCATION=
-    volumes:
-      - :/usr/src/app/upload
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.immich.rule=Host(photos.)"
-      - "traefik.http.services.immich.loadbalancer.server.port=3001"
-      - "traefik.http.routers.immich.middlewares=authentik@docker"
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '2', memory: '2G'}, reservations: {cpus: '0.5', memory: '512M'}}
-
-  immich-microservices:
-    container_name: immich_microservices
-    image: ghcr.io/immich-app/immich-server:release
-    profiles: ["photos", "immich"]
-    command: [ "start-microservices" ]
-    depends_on: [immich-db, immich-redis]
-    # ... (same environment as immich-server)
-    volumes:
-      - :/usr/src/app/upload
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '2', memory: '2G'}, reservations: {cpus: '0.5', memory: '512M'}}
-
-  immich-machine-learning:
-    container_name: immich_machine_learning
-    image: ghcr.io/immich-app/immich-machine-learning:release
-    profiles: ["photos", "immich"]
-    volumes:
-      - /immich/ml-cache:/cache
-    environment:
-      - DB_HOSTNAME=immich-db
-      # ... (and other DB/Redis vars)
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '2', memory: '2G'}, reservations: {cpus: '0.5', memory: '512M'}}
-
-  # =============================================================================
-  # ?? FINANCE PROFILE
-  # =============================================================================
-  firefly-db:
-    image: postgres:15-alpine
-    container_name: firefly-db
-    profiles: ["finance", "firefly-db"]
-    environment:
-      - POSTGRES_PASSWORD=
-      - POSTGRES_USER=firefly
-      - POSTGRES_DB=firefly
-    volumes:
-      - /firefly/db:/var/lib/postgresql/data
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '1', memory: '1G'}, reservations: {cpus: '0.2', memory: '256M'}}
-
-  firefly-iii:
-    image: fireflyiii/core:latest
-    container_name: firefly-iii
-    profiles: ["finance", "firefly-iii"]
-    depends_on: [firefly-db]
-    environment:
-      - DB_CONNECTION=pgsql
-      - DB_HOST=firefly-db
-      - DB_PORT=5432
-      - DB_DATABASE=firefly
-      - DB_USERNAME=firefly
-      - DB_PASSWORD=
-      - APP_KEY=CHANGEME_FIREFLY_APP_KEY # Generate with: openssl rand -hex 32
-      - TRUSTED_PROXIES=**
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.firefly.rule=Host(inance.)"
-      - "traefik.http.services.firefly.loadbalancer.server.port=8080"
-      - "traefik.http.routers.firefly.middlewares=authentik@docker"
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '1', memory: '1G'}, reservations: {cpus: '0.25', memory: '256M'}}
-  # =============================================================================
-  # INVENTORY PROFILE
-  # =============================================================================
-  grocy:
-    image: lscr.io/linuxserver/grocy:latest
-    container_name: grocy
-    profiles: ["inventory", "grocy"]
-    environment:
-      - PUID=
-      - PGID=
-      - TZ=
-    volumes:
-      - /grocy:/config
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.grocy.rule=Host(grocy.)"
-      - "traefik.http.routers.grocy.entrypoints=websecure"
-      - "traefik.http.routers.grocy.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.grocy.middlewares=authentik@docker"
-      - "traefik.http.services.grocy.loadbalancer.server.port=80"
-    networks:
-      - traefik_public
-      - homelab
-    restart: 
-    deploy:
-      resources:
-        limits: {cpus: '0.75', memory: '512M'}
-        reservations: {cpus: '0.1', memory: '128M'}
-
-  # =============================================================================
-  # DOCS PROFILE
-  # =============================================================================
-  bookstack_db:
-    image: mariadb:10.11
-    container_name: bookstack_db
-    profiles: ["docs", "bookstack_db"]
-    environment:
-      - MYSQL_DATABASE=bookstackapp
-      - MYSQL_USER=bookstack
-      - MYSQL_PASSWORD=
-    volumes:
-      - /bookstack-db:/var/lib/mysql
-    networks:
-      - homelab
-    restart: 
-    deploy:
-      resources:
-        limits: {cpus: '1', memory: '1G'}
-        reservations: {cpus: '0.25', memory: '256M'}
+  # ===========================================================================
+  # DOCS PROFILE - Documentation et notes
+  # ===========================================================================
 
   bookstack:
     image: lscr.io/linuxserver/bookstack:latest
     container_name: bookstack
     profiles: ["docs", "bookstack"]
-    depends_on:
-      - bookstack_db
     environment:
-      - PUID=
-      - PGID=
-      - TZ=
-      - APP_URL=https://bookstack.
-      - DB_HOST=bookstack_db
-      - DB_PORT=3306
-      - DB_DATABASE=bookstackapp
-      - DB_USERNAME=bookstack
-      - DB_PASSWORD=
+      <<: *common-env
+      APP_URL: https://wiki.${DOMAIN}
+      DB_HOST: bookstack-db
+      DB_PORT: 3306
+      DB_DATABASE: bookstackapp
+      DB_USERNAME: bookstack
+      DB_PASSWORD: ${BOOKSTACK_DB_PASS}
     volumes:
-      - /bookstack:/config
+      - bookstack_config:/config
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      bookstack-db:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.bookstack.rule=Host(ookstack.)"
+      - "traefik.http.routers.bookstack.rule=Host(`wiki.${DOMAIN}`)"
       - "traefik.http.routers.bookstack.entrypoints=websecure"
       - "traefik.http.routers.bookstack.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.bookstack.middlewares=authentik@docker"
+      - "traefik.http.routers.bookstack.middlewares=authentik@docker,security-headers@docker"
       - "traefik.http.services.bookstack.loadbalancer.server.port=80"
-    networks:
-      - traefik_public
-      - homelab
-    restart: 
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost || exit 1"]
+      <<: *healthcheck-defaults
     deploy:
       resources:
-        limits: {cpus: '1', memory: '1G'}
-        reservations: {cpus: '0.25', memory: '256M'}
-  # =============================================================================
-  # DOCS PROFILE (Paperless)
-  # =============================================================================
-  paperless_db:
-    image: postgres:13
-    container_name: paperless_db
-    profiles: ["docs", "paperless_db"]
-    networks:
-      - homelab
-    environment:
-      - POSTGRES_DB=paperless
-      - POSTGRES_USER=paperless
-      - POSTGRES_PASSWORD=
-    volumes:
-      - /paperless-db:/var/lib/postgresql/data
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '1', memory: '1.5G'}, reservations: {cpus: '0.2', memory: '256M'}}
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
-  paperless_redis:
-    image: redis:7-alpine
-    container_name: paperless_redis
-    profiles: ["docs", "paperless_redis"]
+  bookstack-db:
+    image: mariadb:10.11
+    container_name: bookstack-db
+    profiles: ["docs", "bookstack"]
+    environment:
+      MYSQL_DATABASE: bookstackapp
+      MYSQL_USER: bookstack
+      MYSQL_PASSWORD: ${BOOKSTACK_DB_PASS}
+      MYSQL_ROOT_PASSWORD: ${BOOKSTACK_DB_ROOT_PASS:-${BOOKSTACK_DB_PASS}}
+    volumes:
+      - bookstack_db_data:/var/lib/mysql
     networks:
       - homelab
-    restart: 
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      <<: *healthcheck-defaults
     deploy:
-      resources: {limits: {cpus: '0.5', memory: '256M'}, reservations: {cpus: '0.1', memory: '64M'}}
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
   paperless-ngx:
-    image: lscr.io/linuxserver/paperless-ngx:latest
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
     container_name: paperless-ngx
-    profiles: ["docs", "paperless-ngx"]
-    depends_on:
-      - paperless_db
-      - paperless_redis
+    profiles: ["docs", "paperless"]
+    environment:
+      <<: *common-env
+      PAPERLESS_URL: https://paperless.${DOMAIN}
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY}
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER:-admin}
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASS}
+      PAPERLESS_REDIS: redis://paperless-redis:6379
+      PAPERLESS_DBHOST: paperless-db
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: ${PAPERLESS_DB_PASS}
+      PAPERLESS_OCR_LANGUAGE: fra+eng
+    volumes:
+      - paperless_config:/usr/src/paperless/data
+      - ${DATA_PATH}/paperless/media:/usr/src/paperless/media
+      - paperless_consume:/usr/src/paperless/consume
+      - ${DATA_PATH}/paperless/export:/usr/src/paperless/export
     networks:
       - homelab
       - traefik_public
-    environment:
-      - PUID=
-      - PGID=
-      - TZ=
-      - PAPERLESS_URL=https://paperless.
-      - PAPERLESS_SECRET_KEY=
-      - PAPERLESS_ADMIN_USER=
-      - PAPERLESS_ADMIN_PASSWORD=
-      - PAPERLESS_DBHOST=paperless_db
-      - PAPERLESS_DBNAME=paperless
-      - PAPERLESS_DBUSER=paperless
-      - PAPERLESS_DBPASS=
-      - PAPERLESS_REDIS=redis://paperless_redis:6379
-    volumes:
-      - /paperless-ngx:/config
-      - /paperless-consume:/consume
+    depends_on:
+      paperless-db:
+        condition: service_healthy
+      paperless-redis:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.paperless-ngx.rule=Host(paperless.)"
-      - "traefik.http.routers.paperless-ngx.entrypoints=websecure"
-      - "traefik.http.routers.paperless-ngx.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.paperless-ngx.middlewares=authentik@docker"
-      - "traefik.http.services.paperless-ngx.loadbalancer.server.port=8000"
-    restart: 
+      - "traefik.http.routers.paperless.rule=Host(`paperless.${DOMAIN}`)"
+      - "traefik.http.routers.paperless.entrypoints=websecure"
+      - "traefik.http.routers.paperless.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.paperless.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.paperless.loadbalancer.server.port=8000"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000"]
+      <<: *healthcheck-defaults
+      start_period: 120s
     deploy:
-      resources: {limits: {cpus: '1.5', memory: '2G'}, reservations: {cpus: '0.25', memory: '256M'}}
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
-  # =============================================================================
-  # DOWNLOAD PROFILE (Unpackerr)
-  # =============================================================================
-  unpackerr:
-    image: golift/unpackerr:latest
-    container_name: unpackerr
-    profiles: ["download", "unpackerr"]
-    depends_on:
-      - sonarr
-      - radarr
+  paperless-db:
+    image: postgres:15-alpine
+    container_name: paperless-db
+    profiles: ["docs", "paperless"]
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: ${PAPERLESS_DB_PASS}
+    volumes:
+      - paperless_db_data:/var/lib/postgresql/data
     networks:
       - homelab
-    environment:
-      - TZ=
-      - UN_SONARR_0_URL=http://sonarr:8989
-      - UN_SONARR_0_API_KEY=
-      - UN_RADARR_0_URL=http://radarr:7878
-      - UN_RADARR_0_API_KEY=
-    volumes:
-      - :/downloads
-    restart: 
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless"]
+      <<: *healthcheck-defaults
     deploy:
-      resources: {limits: {cpus: '0.5', memory: '256M'}, reservations: {cpus: '0.1', memory: '64M'}}
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.2'
+          memory: 256M
 
-  # =============================================================================
-  # SECURITY PROFILE (Tailscale)
-  # =============================================================================
+  paperless-redis:
+    image: redis:7-alpine
+    container_name: paperless-redis
+    profiles: ["docs", "paperless"]
+    command: --save 60 1 --loglevel warning
+    volumes:
+      - paperless_redis_data:/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # ===========================================================================
+  # SECURITY PROFILE - Securite et mots de passe
+  # ===========================================================================
+
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    profiles: ["security", "vaultwarden"]
+    environment:
+      <<: *common-env
+      DOMAIN: https://vault.${DOMAIN}
+      WEBSOCKET_ENABLED: "true"
+      SIGNUPS_ALLOWED: ${VAULTWARDEN_SIGNUPS:-false}
+      ADMIN_TOKEN: ${VAULTWARDEN_ADMIN_TOKEN:-}
+    volumes:
+      - vaultwarden_data:/data
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vaultwarden.rule=Host(`vault.${DOMAIN}`)"
+      - "traefik.http.routers.vaultwarden.entrypoints=websecure"
+      - "traefik.http.routers.vaultwarden.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.vaultwarden.middlewares=security-headers@docker"
+      - "traefik.http.services.vaultwarden.loadbalancer.server.port=80"
+      # WebSocket
+      - "traefik.http.routers.vaultwarden-ws.rule=Host(`vault.${DOMAIN}`) && Path(`/notifications/hub`)"
+      - "traefik.http.routers.vaultwarden-ws.entrypoints=websecure"
+      - "traefik.http.routers.vaultwarden-ws.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.vaultwarden-ws.service=vaultwarden-ws"
+      - "traefik.http.services.vaultwarden-ws.loadbalancer.server.port=3012"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:80/alive || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
   tailscale:
     image: tailscale/tailscale:stable
     container_name: tailscale
     profiles: ["security", "tailscale"]
-    hostname: homelab-stack # You can change this
-    networks:
-      - homelab
+    hostname: homelab-server
     environment:
-      - TS_AUTHKEY=
-      - TS_STATE_DIR=/var/lib/tailscale
+      TS_AUTHKEY: ${TAILSCALE_AUTHKEY}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_EXTRA_ARGS: --advertise-exit-node --accept-routes
     volumes:
-      - /tailscale:/var/lib/tailscale
+      - tailscale_data:/var/lib/tailscale
       - /dev/net/tun:/dev/net/tun
     cap_add:
-      - net_admin
-      - sys_module
-    restart: 
-  # =============================================================================
-  # NETWORK PROFILE (AdGuard Home)
-  # =============================================================================
+      - NET_ADMIN
+      - SYS_MODULE
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # ===========================================================================
+  # RECIPES PROFILE - Gestion des recettes
+  # ===========================================================================
+
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:latest
+    container_name: mealie
+    profiles: ["recipes", "mealie"]
+    environment:
+      <<: *common-env
+      ALLOW_SIGNUP: "false"
+      BASE_URL: https://recipes.${DOMAIN}
+      MAX_WORKERS: 1
+      WEB_CONCURRENCY: 1
+    volumes:
+      - mealie_data:/app/data
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mealie.rule=Host(`recipes.${DOMAIN}`)"
+      - "traefik.http.routers.mealie.entrypoints=websecure"
+      - "traefik.http.routers.mealie.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.mealie.middlewares=security-headers@docker"
+      - "traefik.http.services.mealie.loadbalancer.server.port=9000"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/api/app/about || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # ===========================================================================
+  # PHOTOS PROFILE - Gestion des photos
+  # ===========================================================================
+
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:release
+    container_name: immich-server
+    profiles: ["photos", "immich"]
+    environment:
+      <<: *common-env
+      DB_HOSTNAME: immich-db
+      DB_USERNAME: immich
+      DB_PASSWORD: ${IMMICH_DB_PASS}
+      DB_DATABASE_NAME: immich
+      REDIS_HOSTNAME: immich-redis
+      IMMICH_MACHINE_LEARNING_URL: http://immich-ml:3003
+    volumes:
+      - ${UPLOAD_PATH}:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      immich-db:
+        condition: service_healthy
+      immich-redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.immich.rule=Host(`photos.${DOMAIN}`)"
+      - "traefik.http.routers.immich.entrypoints=websecure"
+      - "traefik.http.routers.immich.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.immich.middlewares=security-headers@docker"
+      - "traefik.http.services.immich.loadbalancer.server.port=3001"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3001/server-info/ping || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  immich-ml:
+    image: ghcr.io/immich-app/immich-machine-learning:release
+    container_name: immich-ml
+    profiles: ["photos", "immich"]
+    volumes:
+      - immich_ml_cache:/cache
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3003/ping || exit 1"]
+      <<: *healthcheck-defaults
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  immich-db:
+    image: tensorchord/pgvecto-rs:pg14-v0.2.0
+    container_name: immich-db
+    profiles: ["photos", "immich"]
+    environment:
+      POSTGRES_PASSWORD: ${IMMICH_DB_PASS}
+      POSTGRES_USER: immich
+      POSTGRES_DB: immich
+    volumes:
+      - immich_db_data:/var/lib/postgresql/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U immich"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  immich-redis:
+    image: redis:7-alpine
+    container_name: immich-redis
+    profiles: ["photos", "immich"]
+    command: --save 60 1 --loglevel warning
+    volumes:
+      - immich_redis_data:/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # ===========================================================================
+  # FINANCE PROFILE - Gestion financiere
+  # ===========================================================================
+
+  firefly-iii:
+    image: fireflyiii/core:latest
+    container_name: firefly-iii
+    profiles: ["finance", "firefly"]
+    environment:
+      <<: *common-env
+      APP_KEY: ${FIREFLY_APP_KEY}
+      DB_CONNECTION: pgsql
+      DB_HOST: firefly-db
+      DB_PORT: 5432
+      DB_DATABASE: firefly
+      DB_USERNAME: firefly
+      DB_PASSWORD: ${FIREFLY_DB_PASS}
+      TRUSTED_PROXIES: "**"
+      APP_URL: https://finance.${DOMAIN}
+    volumes:
+      - ${DATA_PATH}/firefly/upload:/var/www/html/storage/upload
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      firefly-db:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.firefly.rule=Host(`finance.${DOMAIN}`)"
+      - "traefik.http.routers.firefly.entrypoints=websecure"
+      - "traefik.http.routers.firefly.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.firefly.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.firefly.loadbalancer.server.port=8080"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  firefly-db:
+    image: postgres:15-alpine
+    container_name: firefly-db
+    profiles: ["finance", "firefly"]
+    environment:
+      POSTGRES_PASSWORD: ${FIREFLY_DB_PASS}
+      POSTGRES_USER: firefly
+      POSTGRES_DB: firefly
+    volumes:
+      - firefly_db_data:/var/lib/postgresql/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U firefly"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.2'
+          memory: 256M
+
+  # ===========================================================================
+  # INVENTORY PROFILE - Gestion des stocks
+  # ===========================================================================
+
+  grocy:
+    image: lscr.io/linuxserver/grocy:latest
+    container_name: grocy
+    profiles: ["inventory", "grocy"]
+    environment:
+      <<: *common-env
+    volumes:
+      - grocy_config:/config
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grocy.rule=Host(`grocy.${DOMAIN}`)"
+      - "traefik.http.routers.grocy.entrypoints=websecure"
+      - "traefik.http.routers.grocy.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.grocy.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.grocy.loadbalancer.server.port=80"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # ===========================================================================
+  # HOME-AUTOMATION PROFILE - Domotique
+  # ===========================================================================
+
+  home-assistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: home-assistant
+    profiles: ["home-automation", "home-assistant"]
+    environment:
+      <<: *common-env
+    volumes:
+      - homeassistant_config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+    networks:
+      - homelab
+      - traefik_public
+    # Privileged pour l'acces aux peripheriques
+    privileged: true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homeassistant.rule=Host(`home.${DOMAIN}`)"
+      - "traefik.http.routers.homeassistant.entrypoints=websecure"
+      - "traefik.http.routers.homeassistant.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.homeassistant.middlewares=security-headers@docker"
+      - "traefik.http.services.homeassistant.loadbalancer.server.port=8123"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8123/api/ || exit 1"]
+      <<: *healthcheck-defaults
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ===========================================================================
+  # UTILS PROFILE - Utilitaires divers
+  # ===========================================================================
+
+  freshrss:
+    image: freshrss/freshrss:latest
+    container_name: freshrss
+    profiles: ["utils", "freshrss"]
+    environment:
+      <<: *common-env
+      CRON_MIN: "*/20"
+    volumes:
+      - freshrss_data:/var/www/FreshRSS/data
+      - ${DATA_PATH}/freshrss/extensions:/var/www/FreshRSS/extensions
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.freshrss.rule=Host(`rss.${DOMAIN}`)"
+      - "traefik.http.routers.freshrss.entrypoints=websecure"
+      - "traefik.http.routers.freshrss.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.freshrss.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.freshrss.loadbalancer.server.port=80"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  metube:
+    image: ghcr.io/alexta69/metube:latest
+    container_name: metube
+    profiles: ["utils", "metube"]
+    environment:
+      <<: *common-env
+      DOWNLOAD_DIR: /downloads
+      AUDIO_DOWNLOAD_DIR: /downloads/audio
+    volumes:
+      - metube_downloads:/downloads
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.metube.rule=Host(`metube.${DOMAIN}`)"
+      - "traefik.http.routers.metube.entrypoints=websecure"
+      - "traefik.http.routers.metube.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.metube.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.metube.loadbalancer.server.port=8081"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081 || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  changedetection:
+    image: ghcr.io/dgtlmoon/changedetection.io:latest
+    container_name: changedetection
+    profiles: ["utils", "changedetection"]
+    environment:
+      <<: *common-env
+      BASE_URL: https://changes.${DOMAIN}
+      PLAYWRIGHT_DRIVER_URL: ws://changedetection-browser:3000
+    volumes:
+      - changedetection_data:/datastore
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      - changedetection-browser
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.changedetection.rule=Host(`changes.${DOMAIN}`)"
+      - "traefik.http.routers.changedetection.entrypoints=websecure"
+      - "traefik.http.routers.changedetection.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.changedetection.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.changedetection.loadbalancer.server.port=5000"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000 || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  changedetection-browser:
+    image: browserless/chrome:latest
+    container_name: changedetection-browser
+    profiles: ["utils", "changedetection"]
+    environment:
+      SCREEN_WIDTH: 1920
+      SCREEN_HEIGHT: 1080
+      SCREEN_DEPTH: 24
+      ENABLE_DEBUGGER: "false"
+      PREBOOT_CHROME: "true"
+      CONNECTION_TIMEOUT: 300000
+      MAX_CONCURRENT_SESSIONS: 10
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  shlink:
+    image: shlinkio/shlink:stable
+    container_name: shlink
+    profiles: ["utils", "shlink"]
+    environment:
+      <<: *common-env
+      DEFAULT_DOMAIN: s.${DOMAIN}
+      IS_HTTPS_ENABLED: "true"
+      DB_DRIVER: postgres
+      DB_HOST: shlink-db
+      DB_NAME: shlink
+      DB_USER: shlink
+      DB_PASSWORD: ${SHLINK_DB_PASS}
+      GEOLITE_LICENSE_KEY: ${GEOLITE_LICENSE_KEY:-}
+      INITIAL_API_KEY: ${SHLINK_API_KEY}
+    volumes:
+      - shlink_data:/etc/shlink/data
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      shlink-db:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.shlink.rule=Host(`s.${DOMAIN}`)"
+      - "traefik.http.routers.shlink.entrypoints=websecure"
+      - "traefik.http.routers.shlink.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.shlink.middlewares=security-headers@docker"
+      - "traefik.http.services.shlink.loadbalancer.server.port=8080"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/rest/health || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  shlink-db:
+    image: postgres:15-alpine
+    container_name: shlink-db
+    profiles: ["utils", "shlink"]
+    environment:
+      POSTGRES_DB: shlink
+      POSTGRES_USER: shlink
+      POSTGRES_PASSWORD: ${SHLINK_DB_PASS}
+    volumes:
+      - shlink_db_data:/var/lib/postgresql/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shlink"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  # ===========================================================================
+  # MANAGEMENT PROFILE - Administration
+  # ===========================================================================
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    profiles: ["management", "portainer"]
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer_data:/data
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.${DOMAIN}`)"
+      - "traefik.http.routers.portainer.entrypoints=websecure"
+      - "traefik.http.routers.portainer.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.portainer.middlewares=security-headers@docker"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/api/system/status || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  code-server:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: code-server
+    profiles: ["management", "code-server"]
+    environment:
+      <<: *common-env
+      PASSWORD: ${CODESERVER_PASSWORD}
+      SUDO_PASSWORD: ${CODESERVER_SUDO_PASSWORD:-${CODESERVER_PASSWORD}}
+      PROXY_DOMAIN: code.${DOMAIN}
+    volumes:
+      - codeserver_config:/config
+      - ${DATA_PATH}:/data
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.code-server.rule=Host(`code.${DOMAIN}`)"
+      - "traefik.http.routers.code-server.entrypoints=websecure"
+      - "traefik.http.routers.code-server.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.code-server.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.code-server.loadbalancer.server.port=8443"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8443/healthz || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    profiles: ["management", "dozzle"]
+    environment:
+      DOZZLE_LEVEL: info
+      DOZZLE_TAILSIZE: 300
+      DOZZLE_FILTER: "status=running"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dozzle.rule=Host(`logs.${DOMAIN}`)"
+      - "traefik.http.routers.dozzle.entrypoints=websecure"
+      - "traefik.http.routers.dozzle.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dozzle.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.dozzle.loadbalancer.server.port=8080"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+
+  # ===========================================================================
+  # NETWORK PROFILE - Reseau et DNS
+  # ===========================================================================
+
   adguardhome:
     image: adguard/adguardhome:latest
     container_name: adguardhome
@@ -682,386 +1944,364 @@ services:
     ports:
       - "53:53/tcp"
       - "53:53/udp"
+      - "853:853/tcp"
+      - "3000:3000/tcp"
     volumes:
-      - /adguardhome/work:/opt/adguardhome/work
-      - /adguardhome/conf:/opt/adguardhome/conf
-    environment:
-      - TZ=
-      - PUID=
-      - PGID=
-      - AGH_USER=
-      - AGH_PASSWORD=
+      - adguardhome_work:/opt/adguardhome/work
+      - adguardhome_conf:/opt/adguardhome/conf
+    networks:
+      - homelab
+      - traefik_public
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.adguardhome.rule=Host(dguard.)"
+      - "traefik.http.routers.adguardhome.rule=Host(`adguard.${DOMAIN}`)"
       - "traefik.http.routers.adguardhome.entrypoints=websecure"
       - "traefik.http.routers.adguardhome.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.adguardhome.middlewares=authentik@docker"
-      - "traefik.http.services.adguardhome.loadbalancer.server.port=3000" # AdGuard Home web UI
-    networks:
-      - traefik_public
-      - homelab
-    restart: 
+      - "traefik.http.routers.adguardhome.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.adguardhome.loadbalancer.server.port=80"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000 || exit 1"]
+      <<: *healthcheck-defaults
     deploy:
-      resources: {limits: {cpus: '0.75', memory: '256M'}, reservations: {cpus: '0.1', memory: '64M'}}
-  # =============================================================================
-  # REMOTE SUPPORT PROFILE (RustDesk)
-  # =============================================================================
-  rustdesk-hbbs:
-    image: rustdesk/rustdesk-server:latest
-    container_name: rustdesk-hbbs
-    profiles: ["remote-support", "rustdesk-hbbs"]
-    command: hbbs -r :21117 -k _ # -k _ to auto-generate or use env var
-    volumes:
-      - /rustdesk:/root
-    environment:
-      - KEY= # Will be generated if _
-      - PUID=
-      - PGID=
-      - TZ=
-    ports:
-      - "21115:21115" # TCP hole punching
-      - "21116:21116" # TCP hole punching
-      - "21116:21116/udp" # UDP hole punching
-      - "21118:21118" # Web client
-    networks:
-      - homelab
-    restart: 
-    depends_on:
-      - rustdesk-hbbr
-    deploy:
-      resources: {limits: {cpus: '0.5', memory: '128M'}, reservations: {cpus: '0.1', memory: '32M'}}
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
 
-  rustdesk-hbbr:
+  # ===========================================================================
+  # REMOTE-SUPPORT PROFILE - Assistance a distance
+  # ===========================================================================
+
+  rustdesk-server:
     image: rustdesk/rustdesk-server:latest
-    container_name: rustdesk-hbbr
-    profiles: ["remote-support", "rustdesk-hbbr"]
+    container_name: rustdesk-server
+    profiles: ["remote-support", "rustdesk"]
+    command: hbbs
+    environment:
+      <<: *common-env
+      RELAY: rustdesk-relay:21117
+      ENCRYPTED_ONLY: 1
+    volumes:
+      - rustdesk_data:/root
+    ports:
+      - "21115:21115"
+      - "21116:21116"
+      - "21116:21116/udp"
+      - "21118:21118"
+    networks:
+      - homelab
+    depends_on:
+      - rustdesk-relay
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+
+  rustdesk-relay:
+    image: rustdesk/rustdesk-server:latest
+    container_name: rustdesk-relay
+    profiles: ["remote-support", "rustdesk"]
     command: hbbr
-    volumes:
-      - /rustdesk:/root
     environment:
-      - KEY= # Must be the same as hbbs
-      - PUID=
-      - PGID=
-      - TZ=
+      <<: *common-env
+    volumes:
+      - rustdesk_data:/root
     ports:
-      - "21117:21117" # TCP relay
-      - "21119:21119" # Web client
+      - "21117:21117"
+      - "21119:21119"
     networks:
       - homelab
-    restart: 
+    restart: unless-stopped
+    logging: *default-logging
     deploy:
-      resources: {limits: {cpus: '0.5', memory: '128M'}, reservations: {cpus: '0.1', memory: '32M'}}
-  # =============================================================================
-  # MANAGEMENT PROFILE (Dozzle)
-  # =============================================================================
-  dozzle:
-    image: amir20/dozzle:latest
-    container_name: dozzle
-    profiles: ["management", "dozzle"]
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.dozzle.rule=Host(dozzle.)"
-      - "traefik.http.routers.dozzle.entrypoints=websecure"
-      - "traefik.http.routers.dozzle.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.dozzle.middlewares=authentik@docker,dozzle-compress@docker"
-      - "traefik.http.services.dozzle.loadbalancer.server.port=8080"
-      - "traefik.http.middlewares.dozzle-compress.compress=true"
-      - "traefik.http.middlewares.dozzle-compress.excludedcontenttypes=text/event-stream"
-    networks:
-      - traefik_public
-      - homelab
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '0.5', memory: '128M'}, reservations: {cpus: '0.1', memory: '32M'}}
-  # =============================================================================
-  # UTILS PROFILE (MeTube)
-  # =============================================================================
-  metube:
-    image: alexta69/metube:latest
-    container_name: metube
-    profiles: ["utils", "metube"]
-    environment:
-      - PUID=
-      - PGID=
-      - TZ=
-      - DOWNLOAD_DIR=/downloads
-    volumes:
-      - /metube:/downloads
-      - /metube:/config
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.metube.rule=Host(metube.)"
-      - "traefik.http.routers.metube.entrypoints=websecure"
-      - "traefik.http.routers.metube.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.metube.middlewares=authentik@docker"
-      - "traefik.http.services.metube.loadbalancer.server.port=8081" # MeTube's default port
-    networks:
-      - traefik_public
-      - homelab
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '0.75', memory: '512M'}, reservations: {cpus: '0.1', memory: '128M'}}
-  # =============================================================================
-  # UTILS PROFILE (Changedetection.io)
-  # =============================================================================
-  changedetection:
-    image: dgtlmoon/changedetection.io:latest
-    container_name: changedetection
-    profiles: ["utils", "changedetection"]
-    environment:
-      - TZ=
-      - PUID=
-      - PGID=
-    volumes:
-      - /changedetection:/datastore
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.changedetection.rule=Host(change.)"
-      - "traefik.http.routers.changedetection.entrypoints=websecure"
-      - "traefik.http.routers.changedetection.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.changedetection.middlewares=authentik@docker"
-      - "traefik.http.services.changedetection.loadbalancer.server.port=5000"
-    networks:
-      - traefik_public
-      - homelab
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '0.75', memory: '512M'}, reservations: {cpus: '0.1', memory: '128M'}}
-  # =============================================================================
-  # MANAGEMENT PROFILE (Nginx Proxy Manager)
-  # =============================================================================
-  npm_db:
-    image: jc21/mariadb-aria:latest
-    container_name: npm_db
-    profiles: ["management", "npm_db"]
-    networks:
-      - homelab
-    environment:
-      - MYSQL_ROOT_PASSWORD= # Not exposed to user
-      - MYSQL_DATABASE=npm
-      - MYSQL_USER=npm
-      - MYSQL_PASSWORD=
-    volumes:
-      - /npm-db:/var/lib/mysql
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '1', memory: '1G'}, reservations: {cpus: '0.2', memory: '256M'}}
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
 
-  npm:
-    image: jc21/nginx-proxy-manager:latest
-    container_name: npm
-    profiles: ["management", "npm"]
-    depends_on:
-      - npm_db
-    networks:
-      - homelab
-      - traefik_public
-    environment:
-      - DB_MYSQL_HOST=npm_db
-      - DB_MYSQL_PORT=3306
-      - DB_MYSQL_USER=npm
-      - DB_MYSQL_PASSWORD=
-      - DB_MYSQL_NAME=npm
-      - PUID=
-      - PGID=
-      - TZ=
-    volumes:
-      - /npm:/data
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.npm.rule=Host(
-pm.)"
-      - "traefik.http.routers.npm.entrypoints=websecure"
-      - "traefik.http.routers.npm.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.npm.middlewares=authentik@docker"
-      - "traefik.http.services.npm.loadbalancer.server.port=81" # NPM admin UI
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '0.75', memory: '512M'}, reservations: {cpus: '0.1', memory: '128M'}}
-  # =============================================================================
-  # HEALTH & FITNESS PROFILE (Wger)
-  # =============================================================================
-  wger-db:
-    image: postgres:15-alpine
-    container_name: wger_db
-    profiles: ["health-fitness", "wger_db"]
-    environment:
-      - POSTGRES_USER=wger
-      - POSTGRES_PASSWORD=
-      - POSTGRES_DB=wger
-    volumes:
-      - /wger-db:/var/lib/postgresql/data/
-    networks:
-      - homelab
-    restart: 
-    healthcheck:
-      test: pg_isready -U wger
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    deploy:
-      resources: {limits: {cpus: '1', memory: '1G'}, reservations: {cpus: '0.2', memory: '256M'}}
+  # ===========================================================================
+  # HEALTH-FITNESS PROFILE - Sante et fitness
+  # ===========================================================================
 
-  wger-cache:
-    image: redis:alpine
-    container_name: wger_cache
-    profiles: ["health-fitness", "wger_cache"]
-    networks:
-      - homelab
-    restart: 
-    healthcheck:
-      test: redis-cli ping
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    deploy:
-      resources: {limits: {cpus: '0.5', memory: '128M'}, reservations: {cpus: '0.1', memory: '32M'}}
-
-  wger-web:
-    image: docker.io/wger/server:latest
-    container_name: wger_web
+  wger:
+    image: wger/server:latest
+    container_name: wger
     profiles: ["health-fitness", "wger"]
-    depends_on:
-      db:
-        condition: service_healthy
-      cache:
-        condition: service_healthy
     environment:
-      - SECRET_KEY=
-      - DEBUG=False
-      - ALLOWED_HOSTS=wger.
-      - SITE_URL=https://wger.
-      - TIME_ZONE=
-      - LANGUAGE_CODE=en-us
-      - DATABASE_URL=postgres://wger:@wger-db:5432/wger
-      - REDIS_URL=redis://wger-cache:6379/0
-      - PUID=
-      - PGID=
-      - TZ=
+      <<: *common-env
+      SECRET_KEY: ${WGER_SECRET_KEY}
+      DEBUG: "False"
+      DJANGO_DB_ENGINE: django.db.backends.postgresql
+      DJANGO_DB_DATABASE: wger
+      DJANGO_DB_USER: wger
+      DJANGO_DB_PASSWORD: ${WGER_DB_PASS}
+      DJANGO_DB_HOST: wger-db
+      DJANGO_DB_PORT: 5432
+      DJANGO_CACHE_BACKEND: django_redis.cache.RedisCache
+      DJANGO_CACHE_LOCATION: redis://wger-redis:6379/1
+      SITE_URL: https://wger.${DOMAIN}
+      CSRF_TRUSTED_ORIGINS: https://wger.${DOMAIN}
+      X_FORWARDED_PROTO_HEADER_SET: "True"
     volumes:
-      - /wger-static:/home/wger/static
-      - /wger-media:/home/wger/media
-      - /wger:/home/wger/data # For Wger configuration
+      - wger_static:/home/wger/static
+      - wger_media:/home/wger/media
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      wger-db:
+        condition: service_healthy
+      wger-redis:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.wger.rule=Host(wger.)"
+      - "traefik.http.routers.wger.rule=Host(`wger.${DOMAIN}`)"
       - "traefik.http.routers.wger.entrypoints=websecure"
       - "traefik.http.routers.wger.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.wger.middlewares=authentik@docker"
+      - "traefik.http.routers.wger.middlewares=authentik@docker,security-headers@docker"
       - "traefik.http.services.wger.loadbalancer.server.port=8000"
-    networks:
-      - traefik_public
-      - homelab
-    restart: 
+    restart: unless-stopped
+    logging: *default-logging
     healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:8000 || exit 1
-      interval: 10s
-      timeout: 5s
-      start_period: 300s
-      retries: 5
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8000 || exit 1"]
+      <<: *healthcheck-defaults
+      start_period: 120s
     deploy:
-      resources: {limits: {cpus: '1.5', memory: '1G'}, reservations: {cpus: '0.25', memory: '256M'}}
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
-  wger-celery-worker:
-    image: docker.io/wger/server:latest
-    container_name: wger_celery_worker
-    profiles: ["health-fitness", "wger_internal"]
-    command: /start-worker.sh
-    depends_on:
-      db:
-        condition: service_healthy
-      cache:
-        condition: service_healthy
+  wger-db:
+    image: postgres:15-alpine
+    container_name: wger-db
+    profiles: ["health-fitness", "wger"]
     environment:
-      - DATABASE_URL=postgres://wger:@wger-db:5432/wger
-      - REDIS_URL=redis://wger-cache:6379/0
-      - SECRET_KEY= # Needed for worker
-      - PUID=
-      - PGID=
-      - TZ=
-    networks:
-      - homelab
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '0.5', memory: '256M'}, reservations: {cpus: '0.1', memory: '64M'}}
-
-  wger-celery-beat:
-    image: docker.io/wger/server:latest
-    container_name: wger_celery_beat
-    profiles: ["health-fitness", "wger_internal"]
-    command: /start-beat.sh
-    depends_on:
-      db:
-        condition: service_healthy
-      cache:
-        condition: service_healthy
-    environment:
-      - DATABASE_URL=postgres://wger:@wger-db:5432/wger
-      - REDIS_URL=redis://wger-cache:6379/0
-      - SECRET_KEY= # Needed for beat
-      - PUID=
-      - PGID=
-      - TZ=
-    networks:
-      - homelab
-    restart: 
-    deploy:
-      resources: {limits: {cpus: '0.5', memory: '256M'}, reservations: {cpus: '0.1', memory: '64M'}}
-  # =============================================================================
-  # UTILS PROFILE (Shlink)
-  # =============================================================================
-  shlink_db:
-    image: postgres:latest
-    container_name: shlink_db
-    profiles: ["utils", "shlink_db"]
-    networks:
-      - homelab
-    environment:
-      - POSTGRES_DB=shlink
-      - POSTGRES_USER=shlink
-      - POSTGRES_PASSWORD=
+      POSTGRES_USER: wger
+      POSTGRES_PASSWORD: ${WGER_DB_PASS}
+      POSTGRES_DB: wger
     volumes:
-      - /shlink-db:/var/lib/postgresql/data
-    restart: 
+      - wger_db_data:/var/lib/postgresql/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wger"]
+      <<: *healthcheck-defaults
     deploy:
-      resources: {limits: {cpus: '1', memory: '512M'}, reservations: {cpus: '0.1', memory: '128M'}}
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
-  shlink:
-    image: shlinkio/shlink:latest
-    container_name: shlink
-    profiles: ["utils", "shlink"]
-    depends_on:
-      - shlink_db
+  wger-redis:
+    image: redis:7-alpine
+    container_name: wger-redis
+    profiles: ["health-fitness", "wger"]
+    command: --save 60 1 --loglevel warning
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+
+  # ===========================================================================
+  # MONITORING PROFILE - Surveillance et alertes
+  # ===========================================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    profiles: ["monitoring", "prometheus"]
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - prometheus_data:/prometheus
+      - ${CONFIG_PATH}/prometheus:/etc/prometheus:ro
     networks:
       - homelab
       - traefik_public
-    environment:
-      - PUID=
-      - PGID=
-      - TZ=
-      - DB_CONNECTION=postgres
-      - DB_HOST=shlink_db
-      - DB_PORT=5432
-      - DB_NAME=shlink
-      - DB_USER=shlink
-      - DB_PASSWORD=
-      - GEOLITE2_LICENSE_KEY=
-      - SHLINK_DEFAULT_BASE_URL=https://shlink.
-      - SHLINK_API_KEY=
-    volumes:
-      - /shlink:/etc/shlink
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.shlink.rule=Host(shlink.)"
-      - "traefik.http.routers.shlink.entrypoints=websecure"
-      - "traefik.http.routers.shlink.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.shlink.middlewares=authentik@docker"
-      - "traefik.http.services.shlink.loadbalancer.server.port=8080" # Shlink's internal API port
-    restart: 
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN}`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.prometheus.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy || exit 1"]
+      <<: *healthcheck-defaults
     deploy:
-      resources: {limits: {cpus: '0.75', memory: '256M'}, reservations: {cpus: '0.1', memory: '64M'}}
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    profiles: ["monitoring", "grafana"]
+    environment:
+      <<: *common-env
+      GF_SERVER_ROOT_URL: https://grafana.${DOMAIN}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASS:-admin}
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-piechart-panel
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: Authentik
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: ${GRAFANA_OAUTH_CLIENT_ID:-}
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${GRAFANA_OAUTH_CLIENT_SECRET:-}
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: https://auth.${DOMAIN}/application/o/authorize/
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: https://auth.${DOMAIN}/application/o/token/
+      GF_AUTH_GENERIC_OAUTH_API_URL: https://auth.${DOMAIN}/application/o/userinfo/
+      GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ${CONFIG_PATH}/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      - prometheus
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.grafana.middlewares=security-headers@docker"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    profiles: ["monitoring", "alertmanager"]
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - alertmanager_data:/alertmanager
+      - ${CONFIG_PATH}/alertmanager:/etc/alertmanager:ro
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alertmanager.rule=Host(`alerts.${DOMAIN}`)"
+      - "traefik.http.routers.alertmanager.entrypoints=websecure"
+      - "traefik.http.routers.alertmanager.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.alertmanager.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9093/-/healthy || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    profiles: ["monitoring", "node-exporter"]
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    profiles: ["monitoring", "cadvisor"]
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
