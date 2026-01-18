@@ -5,16 +5,16 @@ import { SERVICE_MANIFEST, getServiceDependencies } from '../services';
  * Compatible with Homelab Media Server v5.0.0 architecture
  */
 export const generateDockerComposeContent = (selectedServices, configValues, serviceManifest = SERVICE_MANIFEST) => {
-  const domain = configValues.DOMAIN || 'example.com';
-  const configPath = configValues.CONFIG_PATH || '/opt/homelab/config';
-  const dataPath = configValues.DATA_PATH || '/opt/homelab/data';
-  const mediaPath = configValues.MEDIA_PATH || '/opt/homelab/media';
-  const downloadsPath = configValues.DOWNLOADS_PATH || '/opt/homelab/downloads';
-  const uploadPath = configValues.UPLOAD_PATH || '/opt/homelab/uploads';
+  // Convert Set to Array if needed
+  const servicesArray = selectedServices instanceof Set
+    ? Array.from(selectedServices)
+    : Array.isArray(selectedServices)
+      ? selectedServices
+      : [];
 
   // Collect all services including dependencies
   const allServices = new Set();
-  selectedServices.forEach(serviceId => {
+  servicesArray.forEach(serviceId => {
     const deps = getServiceDependencies(serviceId);
     deps.forEach(dep => allServices.add(dep));
   });
@@ -67,7 +67,7 @@ volumes:
 `;
 
   // Generate volumes
-  const volumes = generateVolumes(allServices, serviceManifest);
+  const volumes = generateVolumes(allServices);
   yaml += volumes;
 
   yaml += `
@@ -90,7 +90,7 @@ services:
 /**
  * Generate volumes section
  */
-const generateVolumes = (services, manifest) => {
+const generateVolumes = (services) => {
   const volumeMap = {
     'traefik': ['traefik_letsencrypt'],
     'authentik-server': ['authentik_postgres_data', 'authentik_redis_data'],
