@@ -3,8 +3,6 @@ name: Deploy Configurator to GitHub Pages
 on:
   push:
     branches: ["main"]
-    paths:
-      - 'homelab-configurator/**'
   workflow_dispatch:
 
 permissions:
@@ -19,9 +17,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./homelab-configurator
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,9 +32,11 @@ jobs:
         uses: actions/configure-pages@v4
 
       - name: Install dependencies
+        working-directory: ./homelab-configurator
         run: npm ci
 
       - name: Build
+        working-directory: ./homelab-configurator
         run: npm run build
 
       - name: Upload artifact
