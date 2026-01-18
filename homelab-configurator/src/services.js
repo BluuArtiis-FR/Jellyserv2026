@@ -37,6 +37,16 @@ export const SERVICE_MANIFEST = {
   // ===========================================================================
   // INFRASTRUCTURE - Always active (no profile)
   // ===========================================================================
+  "homer": {
+    group: "infrastructure",
+    name: "Homer",
+    description: "Dashboard d'accueil personnalisable avec tous vos services.",
+    doc_url: "https://github.com/bastienwirtz/homer",
+    always_on: true,
+    expose: true,
+    subdomain: "",
+    port: 8080
+  },
   "traefik": {
     group: "infrastructure",
     name: "Traefik",

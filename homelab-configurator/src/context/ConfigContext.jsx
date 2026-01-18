@@ -114,6 +114,29 @@ export const ConfigProvider = ({ children }) => {
     setConfigValues(prev => ({ ...prev, [fieldName]: generateRandomString() }));
   };
 
+  // Apply a preset (select multiple services at once)
+  const applyPreset = (services) => {
+    if (services === 'all') {
+      // Select all non-internal services
+      const allServices = new Set();
+      for (const serviceKey in SERVICE_MANIFEST) {
+        if (!SERVICE_MANIFEST[serviceKey].internal) {
+          allServices.add(serviceKey);
+        }
+      }
+      setSelectedServices(allServices);
+    } else if (Array.isArray(services)) {
+      const newSelected = new Set();
+      services.forEach(key => {
+        if (SERVICE_MANIFEST[key]) {
+          newSelected.add(key);
+          getRequiredDependencies(key, SERVICE_MANIFEST).forEach(dep => newSelected.add(dep));
+        }
+      });
+      setSelectedServices(newSelected);
+    }
+  };
+
   useEffect(() => {
     const newValues = {};
     let needsUpdate = false;
@@ -258,7 +281,8 @@ certificatesResolvers:
     updateSelection,
     handleInputChange,
     setRandomValue,
-    generatePackage
+    generatePackage,
+    applyPreset
   };
 
   return (

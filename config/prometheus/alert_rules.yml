@@ -1,0 +1,62 @@
+groups:
+  - name: homelab_alerts
+    rules:
+      # Alerte si un conteneur est down
+      - alert: ContainerDown
+        expr: absent(container_last_seen{name=~".+"}) == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} is down"
+          description: "Le conteneur {{ $labels.name }} n'est plus en cours d'exécution."
+
+      # Alerte si CPU élevé
+      - alert: HighCpuUsage
+        expr: (sum(rate(container_cpu_usage_seconds_total{name!=""}[3m])) BY (name) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.name }}"
+          description: "Le conteneur {{ $labels.name }} utilise plus de 80% CPU depuis 5 minutes."
+
+      # Alerte si mémoire élevée
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""} * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.name }}"
+          description: "Le conteneur {{ $labels.name }} utilise plus de 85% de sa mémoire allouée."
+
+      # Alerte si espace disque faible
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} * 100) < 15
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "L'espace disque disponible est inférieur à 15%."
+
+      # Alerte si le serveur est surchargé
+      - alert: HighLoadAverage
+        expr: node_load15 > 4
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High load average"
+          description: "La charge système (load average 15min) est supérieure à 4."
+
+      # Alerte Traefik - trop d'erreurs 5xx
+      - alert: TraefikHighError5xx
+        expr: sum(rate(traefik_service_requests_total{code=~"5.."}[5m])) > 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High 5xx error rate"
+          description: "Traefik retourne un nombre élevé d'erreurs 5xx."

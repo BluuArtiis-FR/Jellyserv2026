@@ -15,12 +15,12 @@ const ServiceSelector = () => {
   const toggleGroup = (groupKey) => {
     setOpenGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
   };
-  
+
   const handleSelectAll = (groupKey, servicesInGroup, isChecked) => {
     const serviceKeysInGroup = new Set(servicesInGroup.map(s => s.key));
     updateSelection(serviceKeysInGroup, isChecked);
   };
-  
+
   const handleServiceChange = (serviceKey, isChecked) => {
     updateSelection(new Set([serviceKey]), isChecked);
   };
@@ -28,8 +28,8 @@ const ServiceSelector = () => {
   return (
     <section className="space-y-4">
        <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-slate-800">Étape 1: Choix des Services</h2>
-        <p className="text-slate-500">Sélectionnez les applications et services que vous souhaitez inclure dans votre stack.</p>
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Étape 1: Choix des Services</h2>
+        <p className="text-slate-500 dark:text-slate-400">Sélectionnez les applications et services que vous souhaitez inclure dans votre stack.</p>
       </div>
       {Object.entries(servicesByGroup).map(([groupKey, services]) => {
         if (services.length === 0) return null;
@@ -38,24 +38,24 @@ const ServiceSelector = () => {
         const isAllSelected = selectedCount === services.length;
 
         return (
-          <div key={groupKey} className="bg-white/80 backdrop-blur-sm border border-slate-200/50 rounded-xl shadow-sm transition-all duration-300">
+          <div key={groupKey} className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 rounded-xl shadow-sm transition-all duration-300">
             <header
               className="flex items-center justify-between p-4 cursor-pointer"
               onClick={() => toggleGroup(groupKey)}
             >
               <div className="flex items-center gap-4">
-                <h3 className="font-semibold text-lg text-slate-900">{SERVICE_GROUPS[groupKey] || groupKey}</h3>
-                <span className="text-sm px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-medium">
+                <h3 className="font-semibold text-lg text-slate-900 dark:text-slate-100">{SERVICE_GROUPS[groupKey] || groupKey}</h3>
+                <span className="text-sm px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full font-medium">
                   {selectedCount} / {services.length}
                 </span>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
-                  <label htmlFor={`select-all-${groupKey}`} className="text-sm font-medium text-slate-600">Tout</label>
+                  <label htmlFor={`select-all-${groupKey}`} className="text-sm font-medium text-slate-600 dark:text-slate-400">Tout</label>
                   <input
                     type="checkbox"
                     id={`select-all-${groupKey}`}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-700"
                     checked={isAllSelected}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => handleSelectAll(groupKey, services, e.target.checked)}
@@ -65,7 +65,7 @@ const ServiceSelector = () => {
               </div>
             </header>
             <Collapse in={openGroups[groupKey]}>
-              <div className="p-4 border-t border-slate-200/80">
+              <div className="p-4 border-t border-slate-200/80 dark:border-slate-700/80">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {services.map(service => (
                     <div key={service.key} title={service.description} className="flex items-start">
@@ -73,14 +73,14 @@ const ServiceSelector = () => {
                           <input
                             type="checkbox"
                             id={`service-${service.key}`}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-700"
                             checked={selectedServices.has(service.key)}
                             onChange={(e) => handleServiceChange(service.key, e.target.checked)}
                           />
                        </div>
                        <div className="ml-3 text-sm">
-                          <label htmlFor={`service-${service.key}`} className="font-medium text-gray-700">{service.name}</label>
-                          <p className="text-gray-500 text-xs">{service.description}</p>
+                          <label htmlFor={`service-${service.key}`} className="font-medium text-gray-700 dark:text-gray-300">{service.name}</label>
+                          <p className="text-gray-500 dark:text-gray-400 text-xs">{service.description}</p>
                        </div>
                     </div>
                   ))}

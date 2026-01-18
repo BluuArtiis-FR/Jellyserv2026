@@ -118,6 +118,8 @@ volumes:
   alertmanager_data:
   # Backup
   backup_data:
+  # Portal
+  homer_assets:
 
 services:
   # ===========================================================================
@@ -2305,3 +2307,40 @@ services:
         reservations:
           cpus: '0.1'
           memory: 64M
+
+  # ===========================================================================
+  # PORTAL - Dashboard d'accueil
+  # ===========================================================================
+
+  homer:
+    image: b4bz/homer:latest
+    container_name: homer
+    environment:
+      <<: *common-env
+      INIT_ASSETS: 1
+    volumes:
+      - homer_assets:/www/assets
+      - ${CONFIG_PATH:-/opt/homelab/config}/homer:/www/assets/config
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homer.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.homer.entrypoints=websecure"
+      - "traefik.http.routers.homer.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.homer.middlewares=authentik@docker"
+      - "traefik.http.services.homer.loadbalancer.server.port=8080"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+        reservations:
+          cpus: '0.05'
+          memory: 16M
