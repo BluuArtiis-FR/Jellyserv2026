@@ -707,14 +707,14 @@ export const SERVICE_MANIFEST = {
 // Helper function to get all services in a group
 export const getServicesByGroup = (groupId) => {
   return Object.entries(SERVICE_MANIFEST)
-    .filter(([_, service]) => service.group === groupId)
+    .filter(([, service]) => service.group === groupId)
     .map(([id, service]) => ({ id, ...service }));
 };
 
 // Helper function to get all exposed (non-internal) services
 export const getExposedServices = () => {
   return Object.entries(SERVICE_MANIFEST)
-    .filter(([_, service]) => !service.internal && service.expose)
+    .filter(([, service]) => !service.internal && service.expose)
     .map(([id, service]) => ({ id, ...service }));
 };
 
