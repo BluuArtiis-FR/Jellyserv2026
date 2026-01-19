@@ -35,10 +35,35 @@ const Header = () => {
   const appsCount = selectedServices.size;
 
   const presets = [
-    { id: 'media', name: 'Media Stack', icon: '🎬', services: ['jellyfin', 'jellyseerr', 'sonarr', 'radarr', 'prowlarr', 'qbittorrent', 'gluetun', 'bazarr'] },
-    { id: 'cloud', name: 'Cloud Stack', icon: '☁️', services: ['nextcloud', 'duplicati', 'filebrowser', 'onlyoffice'] },
-    { id: 'full', name: 'Full Stack', icon: '🚀', services: 'all' },
-    { id: 'minimal', name: 'Minimal', icon: '📦', services: ['jellyfin', 'nextcloud', 'vaultwarden'] },
+    {
+      id: 'media',
+      name: 'Media Stack',
+      icon: '🎬',
+      services: [
+        'jellyfin', 'jellyseerr', 'requestrr', 'tdarr', 'jellystat',
+        'sonarr', 'radarr', 'lidarr', 'readarr', 'bazarr',
+        'prowlarr', 'flaresolverr', 'qbittorrent', 'gluetun',
+        'unpackerr', 'recyclarr'
+      ]
+    },
+    {
+      id: 'cloud',
+      name: 'Cloud Stack',
+      icon: '☁️',
+      services: ['nextcloud', 'duplicati', 'filebrowser', 'onlyoffice', 'stirling-pdf', 'paperless-ngx']
+    },
+    {
+      id: 'full',
+      name: 'Full Stack',
+      icon: '🚀',
+      services: 'all'
+    },
+    {
+      id: 'minimal',
+      name: 'Minimal',
+      icon: '📦',
+      services: ['jellyfin', 'sonarr', 'radarr', 'prowlarr', 'qbittorrent', 'gluetun']
+    },
   ];
 
   return (
