@@ -1,7 +1,7 @@
 // services.js
 // This file is the "manifest" of all services available in docker-compose.yml
 // It defines their group, dependencies, and specific configuration variables.
-// SYNCHRONIZED with docker-compose.yml v5.0.0 (62 services)
+// SYNCHRONIZED with docker-compose.yml v5.2.0 (70 services)
 
 // Helper function to create a standard secret variable definition
 const createSecret = (name, description, link_to = null) => ({
@@ -126,10 +126,18 @@ export const SERVICE_MANIFEST = {
     name: "Prowlarr",
     description: "Gestionnaire d'indexers pour Sonarr, Radarr, Lidarr.",
     doc_url: "https://wiki.servarr.com/prowlarr",
-    dependencies: ["gluetun"],
+    dependencies: ["gluetun", "flaresolverr"],
     expose: true,
     subdomain: "prowlarr",
     port: 9696
+  },
+  "flaresolverr": {
+    group: "download",
+    name: "FlareSolverr",
+    description: "Proxy pour contourner les protections Cloudflare des indexers.",
+    doc_url: "https://github.com/FlareSolverr/FlareSolverr",
+    internal: true,
+    port: 8191
   },
   "sonarr": {
     group: "download",
@@ -170,6 +178,19 @@ export const SERVICE_MANIFEST = {
       createSecret("LIDARR_API_KEY", "Clé API pour Lidarr.")
     ]
   },
+  "readarr": {
+    group: "download",
+    name: "Readarr",
+    description: "Gestion automatique de livres et ebooks.",
+    doc_url: "https://wiki.servarr.com/readarr",
+    dependencies: ["prowlarr"],
+    expose: true,
+    subdomain: "readarr",
+    port: 8787,
+    env_vars: [
+      createSecret("READARR_API_KEY", "Clé API pour Readarr.")
+    ]
+  },
   "bazarr": {
     group: "download",
     name: "Bazarr",
@@ -185,6 +206,14 @@ export const SERVICE_MANIFEST = {
     name: "Unpackerr",
     description: "Décompresse automatiquement les archives téléchargées.",
     doc_url: "https://unpackerr.zip",
+    dependencies: ["sonarr", "radarr"],
+    internal: true
+  },
+  "recyclarr": {
+    group: "download",
+    name: "Recyclarr",
+    description: "Synchronise les guides TRaSH pour optimiser la qualité de Sonarr/Radarr.",
+    doc_url: "https://recyclarr.dev",
     dependencies: ["sonarr", "radarr"],
     internal: true
   },
@@ -210,6 +239,16 @@ export const SERVICE_MANIFEST = {
     expose: true,
     subdomain: "requests",
     port: 5055
+  },
+  "requestrr": {
+    group: "media",
+    name: "Requestrr",
+    description: "Bot Discord pour les demandes de films/séries via Sonarr/Radarr.",
+    doc_url: "https://github.com/thomst08/requestrr",
+    dependencies: ["sonarr", "radarr"],
+    expose: true,
+    subdomain: "requestrr",
+    port: 4545
   },
   "tdarr": {
     group: "media",
@@ -711,6 +750,25 @@ export const SERVICE_MANIFEST = {
     doc_url: "https://github.com/google/cadvisor",
     internal: true,
     port: 8080
+  },
+  "uptime-kuma": {
+    group: "monitoring",
+    name: "Uptime Kuma",
+    description: "Monitoring d'uptime avec alertes et pages de statut.",
+    doc_url: "https://github.com/louislam/uptime-kuma",
+    expose: true,
+    subdomain: "status",
+    port: 3001
+  },
+  "watchtower": {
+    group: "monitoring",
+    name: "Watchtower",
+    description: "Mise à jour automatique des conteneurs Docker.",
+    doc_url: "https://containrrr.dev/watchtower",
+    internal: true,
+    env_vars: [
+      { name: "WATCHTOWER_NOTIFICATION_URL", description: "URL de notification (Discord, Telegram, etc.).", type: "text" }
+    ]
   }
 };
 

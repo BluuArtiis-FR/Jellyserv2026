@@ -1,5 +1,5 @@
 # =============================================================================
-# JELLYSERV2026 - Version 5.1.0 PRODUCTION
+# JELLYSERV2026 - Version 5.2.0 PRODUCTION
 # =============================================================================
 # Architecture hybride avec profils Docker Compose
 # Inspiré de YunoHost pour la robustesse et la facilité d'utilisation
@@ -58,6 +58,8 @@ volumes:
   lidarr_config:
   bazarr_config:
   unpackerr_config:
+  readarr_config:
+  recyclarr_config:
   # Cloud
   nextcloud_data:
   nextcloud_db_data:
@@ -116,6 +118,9 @@ volumes:
   prometheus_data:
   grafana_data:
   alertmanager_data:
+  uptime_kuma_data:
+  # Media automation
+  requestrr_config:
   # Backup
   backup_data:
   # Portal
@@ -407,6 +412,8 @@ services:
     networks:
       - homelab
       - traefik_public
+    depends_on:
+      - flaresolverr
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.prowlarr.rule=Host(`prowlarr.${DOMAIN}`)"
@@ -427,6 +434,31 @@ services:
         reservations:
           cpus: '0.1'
           memory: 128M
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    profiles: ["download", "flaresolverr"]
+    environment:
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+      - CAPTCHA_SOLVER=none
+      - TZ=${TZ:-Europe/Paris}
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8191/health || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
@@ -526,6 +558,42 @@ services:
     logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8686/ping || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  readarr:
+    image: lscr.io/linuxserver/readarr:develop
+    container_name: readarr
+    profiles: ["download", "readarr"]
+    environment:
+      <<: *common-env
+    volumes:
+      - readarr_config:/config
+      - ${MEDIA_PATH}/books:/books
+      - ${DOWNLOADS_PATH}:/downloads
+    networks:
+      - homelab
+      - traefik_public
+    depends_on:
+      - prowlarr
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.readarr.rule=Host(`readarr.${DOMAIN}`)"
+      - "traefik.http.routers.readarr.entrypoints=websecure"
+      - "traefik.http.routers.readarr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.readarr.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.readarr.loadbalancer.server.port=8787"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8787/ping || exit 1"]
       <<: *healthcheck-defaults
     deploy:
       resources:
@@ -2306,6 +2374,119 @@ services:
           memory: 256M
         reservations:
           cpus: '0.1'
+          memory: 64M
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    profiles: ["monitoring", "uptime-kuma"]
+    volumes:
+      - uptime_kuma_data:/app/data
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.uptime-kuma.rule=Host(`status.${DOMAIN}`)"
+      - "traefik.http.routers.uptime-kuma.entrypoints=websecure"
+      - "traefik.http.routers.uptime-kuma.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.uptime-kuma.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.uptime-kuma.loadbalancer.server.port=3001"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:3001 || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    profiles: ["monitoring", "watchtower"]
+    environment:
+      - TZ=${TZ:-Europe/Paris}
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_SCHEDULE=0 0 4 * * *
+      - WATCHTOWER_NOTIFICATIONS=shoutrrr
+      - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
+      - WATCHTOWER_INCLUDE_STOPPED=false
+      - WATCHTOWER_REVIVE_STOPPED=false
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+
+  # ===========================================================================
+  # MEDIA AUTOMATION - Bots et automatisation
+  # ===========================================================================
+
+  requestrr:
+    image: thomst08/requestrr:latest
+    container_name: requestrr
+    profiles: ["media", "requestrr"]
+    volumes:
+      - requestrr_config:/root/config
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.requestrr.rule=Host(`requestrr.${DOMAIN}`)"
+      - "traefik.http.routers.requestrr.entrypoints=websecure"
+      - "traefik.http.routers.requestrr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.requestrr.middlewares=authentik@docker,security-headers@docker"
+      - "traefik.http.services.requestrr.loadbalancer.server.port=4545"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:4545 || exit 1"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:latest
+    container_name: recyclarr
+    profiles: ["download", "recyclarr"]
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      - TZ=${TZ:-Europe/Paris}
+    volumes:
+      - recyclarr_config:/config
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.05'
           memory: 64M
 
   # ===========================================================================

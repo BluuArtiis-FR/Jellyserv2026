@@ -1,6 +1,6 @@
 <div align="center">
 
-# Homelab-Media-Server v5.1.0
+# Homelab-Media-Server v5.2.0
 
 **Plateforme complete de deploiement de serveur multimedia personnel avec Docker**
 
@@ -17,7 +17,7 @@
 
 ## Fonctionnalites
 
-- **63 services Docker** pre-configures avec healthchecks et limites de ressources
+- **70 services Docker** pre-configures avec healthchecks et limites de ressources
 - **SSL automatique** via Traefik + Let's Encrypt
 - **SSO integre** avec Authentik pour tous vos services
 - **Homer Dashboard** comme portail d'accueil personnalisable
@@ -104,6 +104,7 @@ make up
 |---------|-------------|-----|
 | Jellyfin | Serveur multimedia | `jellyfin.DOMAIN` |
 | Jellyseerr | Demandes de contenu | `requests.DOMAIN` |
+| Requestrr | Bot Discord demandes | `requestrr.DOMAIN` |
 | Tdarr | Transcodage automatique | `tdarr.DOMAIN` |
 | Jellystat | Statistiques Jellyfin | `jellystat.DOMAIN` |
 
@@ -113,10 +114,13 @@ make up
 | Gluetun | Tunnel VPN | - |
 | qBittorrent | Client torrent | `localhost:8080` |
 | Prowlarr | Gestionnaire d'indexeurs | `prowlarr.DOMAIN` |
+| FlareSolverr | Bypass Cloudflare | - |
 | Sonarr | Series TV | `sonarr.DOMAIN` |
 | Radarr | Films | `radarr.DOMAIN` |
 | Lidarr | Musique | `lidarr.DOMAIN` |
+| Readarr | Livres/Ebooks | `readarr.DOMAIN` |
 | Bazarr | Sous-titres | `bazarr.DOMAIN` |
+| Recyclarr | Sync guides TRaSH | - |
 
 ### Cloud & Files
 | Service | Description | URL |
@@ -186,6 +190,8 @@ make up
 | Prometheus | Metriques | `prometheus.DOMAIN` |
 | Grafana | Dashboards | `grafana.DOMAIN` |
 | Alertmanager | Alertes | `alerts.DOMAIN` |
+| Uptime Kuma | Monitoring uptime | `status.DOMAIN` |
+| Watchtower | Mise a jour auto | - |
 
 ---
 
@@ -343,6 +349,6 @@ MIT License - Voir [LICENSE](LICENSE)
 
 <div align="center">
 
-**Homelab-Media-Server v5.1.0** - Votre serveur multimedia, simplifie.
+**Homelab-Media-Server v5.2.0** - Votre serveur multimedia, simplifie.
 
 </div>
