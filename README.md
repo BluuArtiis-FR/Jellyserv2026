@@ -1,15 +1,15 @@
 <div align="center">
 
-# Homelab-Media-Server v5.0.0
+# Homelab-Media-Server v5.1.0
 
 **Plateforme complete de deploiement de serveur multimedia personnel avec Docker**
 
 *Inspire de YunoHost pour la robustesse et la facilite d'utilisation*
 
-[![License](https://img.shields.io/github/license/BluuArtiis-FR/Homelab-Media-Server?style=for-the-badge)](LICENSE)
-[![Deploy](https://img.shields.io/github/actions/workflow/status/BluuArtiis-FR/Homelab-Media-Server/pages/pages-build-deployment?label=Deploy&style=for-the-badge)](https://bluuartiis-fr.github.io/Homelab-Media-Server/)
+[![License](https://img.shields.io/github/license/BluuArtiis-FR/Jellyserv2026?style=for-the-badge)](LICENSE)
+[![GitHub Pages](https://img.shields.io/github/deployments/BluuArtiis-FR/Jellyserv2026/github-pages?label=Configurateur&style=for-the-badge)](https://bluuartiis-fr.github.io/Jellyserv2026/)
 
-[Configurateur Web](https://bluuartiis-fr.github.io/Homelab-Media-Server/) | [Guide Avance](./docs/GUIDE_AVANCE.md) | [Troubleshooting](./docs/TROUBLESHOOTING.md)
+[Configurateur Web](https://bluuartiis-fr.github.io/Jellyserv2026/) | [Guide Avance](./docs/GUIDE_AVANCE.md) | [Troubleshooting](./docs/TROUBLESHOOTING.md)
 
 </div>
 
@@ -17,14 +17,16 @@
 
 ## Fonctionnalites
 
-- **60+ services Docker** pre-configures avec healthchecks et limites de ressources
+- **63 services Docker** pre-configures avec healthchecks et limites de ressources
 - **SSL automatique** via Traefik + Let's Encrypt
 - **SSO integre** avec Authentik pour tous vos services
+- **Homer Dashboard** comme portail d'accueil personnalisable
 - **Systeme de profils** pour activer/desactiver facilement des groupes de services
 - **Stack de monitoring** complete (Prometheus, Grafana, Alertmanager)
+- **Notifications** Discord/Telegram via Alertmanager
 - **Backup integre** avec Duplicati + scripts de sauvegarde DB
 - **VPN pour telechargements** via Gluetun
-- **Configurateur web** pour generer votre configuration sans toucher au code
+- **Configurateur web** avec theme clair/sombre et presets rapides
 - **CLI puissante** avec Makefile pour gerer votre stack
 
 ---
@@ -33,8 +35,8 @@
 
 ### Option 1: Configurateur Web (Recommande)
 
-1. Allez sur [le configurateur](https://bluuartiis-fr.github.io/Homelab-Media-Server/)
-2. Selectionnez vos services
+1. Allez sur [le configurateur](https://bluuartiis-fr.github.io/Jellyserv2026/)
+2. Utilisez les **presets** (Media, Cloud, Full) ou selectionnez vos services
 3. Configurez votre domaine et vos chemins
 4. Telechargez le package `.zip`
 5. Extrayez et lancez `docker compose up -d`
@@ -43,13 +45,14 @@
 
 ```bash
 # Cloner le depot
-git clone https://github.com/BluuArtiis-FR/Homelab-Media-Server.git
-cd Homelab-Media-Server
+git clone https://github.com/BluuArtiis-FR/Jellyserv2026.git
+cd Jellyserv2026
 
 # Installation initiale
 make install
 
 # Editer la configuration
+cp .env.example .env
 nano .env
 
 # Generer les secrets
@@ -72,11 +75,11 @@ make up
                      +------+------+
                             |
             +---------------+---------------+
-            |                               |
-     +------v------+                 +------v------+
-     |  AUTHENTIK  |                 |  SERVICES   |
-     |    (SSO)    |                 |  (Profils)  |
-     +-------------+                 +------+------+
+            |               |               |
+     +------v------+ +------v------+ +------v------+
+     |    HOMER    | |  AUTHENTIK  | |  SERVICES   |
+     | (Dashboard) | |    (SSO)    | |  (Profils)  |
+     +-------------+ +-------------+ +------+------+
                                             |
        +----------+----------+----------+---+---+----------+
        |          |          |          |       |          |
@@ -87,7 +90,14 @@ make up
 
 ---
 
-## Services Disponibles
+## Services Disponibles (63 services)
+
+### Infrastructure (toujours actif)
+| Service | Description | URL |
+|---------|-------------|-----|
+| Homer | Dashboard d'accueil | `DOMAIN` |
+| Traefik | Reverse proxy SSL | `traefik.DOMAIN` |
+| Authentik | SSO/Auth | `auth.DOMAIN` |
 
 ### Media & Streaming
 | Service | Description | URL |
@@ -156,6 +166,7 @@ make up
 | MeTube | Telechargeur video | `metube.DOMAIN` |
 | Changedetection | Surveillance web | `changes.DOMAIN` |
 | Shlink | Raccourcisseur URL | `s.DOMAIN` |
+| Mealie | Gestion recettes | `recipes.DOMAIN` |
 
 ### Management
 | Service | Description | URL |
@@ -211,6 +222,18 @@ make validate        # Valider docker-compose
 
 ---
 
+## Configurateur Web
+
+Le [configurateur web](https://bluuartiis-fr.github.io/Jellyserv2026/) offre:
+
+- **Theme clair/sombre** avec persistance
+- **Presets rapides**: Media Stack, Cloud Stack, Full Stack, Minimal
+- **Selection visuelle** des 63 services
+- **Generation automatique** des secrets
+- **Export ZIP** pret a deployer
+
+---
+
 ## Configuration
 
 ### Profils
@@ -225,6 +248,19 @@ COMPOSE_PROFILES=media,download
 COMPOSE_PROFILES=media,download,cloud,office,docs,security,recipes,photos,finance,inventory,home-automation,utils,management,network,monitoring
 ```
 
+### Notifications (Alertmanager)
+
+Configurez dans `.env`:
+
+```bash
+# Discord
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/xxxxx/xxxxx
+
+# Telegram
+TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
+TELEGRAM_CHAT_ID=-1001234567890
+```
+
 ### Secrets
 
 Generez tous les secrets avec:
@@ -232,8 +268,6 @@ Generez tous les secrets avec:
 ```bash
 make secrets-generate
 ```
-
-Puis copiez les valeurs dans votre `.env`.
 
 ---
 
@@ -252,13 +286,16 @@ Puis copiez les valeurs dans votre `.env`.
 
 ```
 .
-├── docker-compose.yml      # Definition des 60+ services
+├── docker-compose.yml      # Definition des 63 services
 ├── .env.example            # Template de configuration
 ├── .env                    # Votre configuration (a creer)
 ├── Makefile                # Interface CLI
 ├── GEMINI.md               # Instructions pour Gemini CLI
 ├── install.sh              # Script d'installation Linux
 ├── config/                 # Configurations des services
+│   ├── homer/              # Dashboard Homer
+│   ├── prometheus/         # Metriques et alertes
+│   └── alertmanager/       # Notifications
 ├── data/                   # Donnees des applications
 ├── downloads/              # Fichiers telecharges
 ├── media/                  # Bibliotheque multimedia
@@ -280,6 +317,7 @@ Puis copiez les valeurs dans votre `.env`.
 - **VPN obligatoire** pour les telechargements
 - **Secrets** generes aleatoirement
 - **Healthchecks** sur tous les services
+- **Alertes** en cas de probleme (CPU, RAM, disque)
 
 ---
 
@@ -292,7 +330,7 @@ Les contributions sont les bienvenues ! Voir [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Support
 
 - **Documentation**: Ce README + [docs/](./docs/)
-- **Issues**: [GitHub Issues](https://github.com/BluuArtiis-FR/Homelab-Media-Server/issues)
+- **Issues**: [GitHub Issues](https://github.com/BluuArtiis-FR/Jellyserv2026/issues)
 - **Gemini CLI**: Le fichier `GEMINI.md` permet d'obtenir de l'aide via Gemini
 
 ---
@@ -305,6 +343,6 @@ MIT License - Voir [LICENSE](LICENSE)
 
 <div align="center">
 
-**Homelab-Media-Server** - Votre serveur multimedia, simplifie.
+**Homelab-Media-Server v5.1.0** - Votre serveur multimedia, simplifie.
 
 </div>
