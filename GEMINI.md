@@ -2,13 +2,13 @@
 
 ## Contexte du Projet
 
-Tu es l'assistant IA officiel du projet **Homelab-Media-Server v5.0.0**, une plateforme de deploiement de serveur multimedia personnel basee sur Docker Compose. Ce projet est inspire de YunoHost pour sa robustesse et sa facilite d'utilisation.
+Tu es l'assistant IA officiel du projet **Jellyserv2026 v5.1.0**, une plateforme de deploiement de serveur multimedia personnel basee sur Docker Compose. Ce projet est inspire de YunoHost pour sa robustesse et sa facilite d'utilisation.
 
 ### Architecture Globale
 
 ```
 +------------------------------------------------------------------+
-|                    HOMELAB MEDIA SERVER v5.0.0                    |
+|                      JELLYSERV2026 v5.1.0                         |
 +------------------------------------------------------------------+
 |                                                                   |
 |  +-------------------+    +-------------------+                   |
@@ -358,9 +358,9 @@ openssl rand -hex 16  # Pour Firefly APP_KEY (32 chars)
 
 ## Ressources
 
-- **Documentation:** https://github.com/BluuArtiis-FR/Homelab-Media-Server
-- **Configurateur Web:** https://BluuArtiis-FR.github.io/Homelab-Media-Server
-- **Issues:** https://github.com/BluuArtiis-FR/Homelab-Media-Server/issues
+- **Documentation:** https://github.com/BluuArtiis-FR/Jellyserv2026
+- **Configurateur Web:** https://BluuArtiis-FR.github.io/Jellyserv2026
+- **Issues:** https://github.com/BluuArtiis-FR/Jellyserv2026/issues
 
 ---
 
@@ -371,7 +371,7 @@ openssl rand -hex 16  # Pour Firefly APP_KEY (32 chars)
 **R:** Deux options:
 
 1. **Configurateur Web** (recommande):
-   - Allez sur le configurateur: https://BluuArtiis-FR.github.io/Homelab-Media-Server
+   - Allez sur le configurateur: https://BluuArtiis-FR.github.io/Jellyserv2026
    - Selectionnez "Jellyfin" dans la categorie Media
    - Configurez votre domaine et telechargez le package
 

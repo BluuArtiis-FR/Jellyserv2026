@@ -1,5 +1,5 @@
 # =============================================================================
-# HOMELAB MEDIA SERVER v5.0.0 - MAKEFILE
+# JELLYSERV2026 v5.1.0 - MAKEFILE
 # =============================================================================
 # Interface CLI principale pour la gestion de la stack
 # Inspire de YunoHost pour la simplicite d'utilisation
@@ -305,7 +305,7 @@ diagnose: ## Diagnostic complet du systeme
 	@echo ""
 
 info: ## Informations sur l'installation
-	@echo "$(BOLD)$(CYAN)Homelab Media Server v5.0.0$(RESET)"
+	@echo "$(BOLD)$(CYAN)Jellyserv2026 v5.1.0$(RESET)"
 	@echo ""
 	@if [ -f $(ENV_FILE) ]; then \
 		echo "$(GREEN)Configuration:$(RESET)"; \
@@ -314,8 +314,8 @@ info: ## Informations sur l'installation
 		echo "  Timezone: $$(grep '^TZ=' $(ENV_FILE) | cut -d= -f2)"; \
 	fi
 	@echo ""
-	@echo "$(GREEN)Documentation:$(RESET) https://github.com/BluuArtiis-FR/Homelab-Media-Server"
-	@echo "$(GREEN)Configurateur:$(RESET) https://BluuArtiis-FR.github.io/Homelab-Media-Server"
+	@echo "$(GREEN)Documentation:$(RESET) https://github.com/BluuArtiis-FR/Jellyserv2026"
+	@echo "$(GREEN)Configurateur:$(RESET) https://BluuArtiis-FR.github.io/Jellyserv2026"
 	@echo ""
 
 services: ## Liste tous les services disponibles

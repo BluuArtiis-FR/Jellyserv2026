@@ -1,4 +1,4 @@
-# Contribuer à Homelab-Media-Server
+# Contribuer à Jellyserv2026
 
 Merci de l'intérêt que vous portez à ce projet ! Toutes les contributions, qu'il s'agisse de rapports de bugs, de nouvelles fonctionnalités ou d'ajouts de services, sont les bienvenues.
 
@@ -10,11 +10,11 @@ Ce projet et tous ses participants sont régis par le [Code de Conduite](./CODE_
 
 ### Signaler un Bug
 
-Si vous rencontrez un bug avec le configurateur ou le projet en général, veuillez [ouvrir une "issue"](https://github.com/BluuArtiis-FR/Homelab-Media-Server/issues/new/choose) en utilisant le modèle "Bug Report". Veuillez être aussi détaillé que possible.
+Si vous rencontrez un bug avec le configurateur ou le projet en général, veuillez [ouvrir une "issue"](https://github.com/BluuArtiis-FR/Jellyserv2026/issues/new/choose) en utilisant le modèle "Bug Report". Veuillez être aussi détaillé que possible.
 
 ### Proposer une Amélioration ou une Fonctionnalité
 
-Si vous avez une idée pour une nouvelle fonctionnalité ou une amélioration, [ouvrez une "issue"](https://github.com/BluuArtiis-FR/Homelab-Media-Server/issues/new/choose) en utilisant le modèle "Feature Request".
+Si vous avez une idée pour une nouvelle fonctionnalité ou une amélioration, [ouvrez une "issue"](https://github.com/BluuArtiis-FR/Jellyserv2026/issues/new/choose) en utilisant le modèle "Feature Request".
 
 ## Développement Local du Configurateur
 
@@ -22,8 +22,8 @@ Si vous souhaitez modifier le code du configurateur web, voici comment mettre en
 
 1.  **Forkez et Clonez le Dépôt**
     ```bash
-    git clone https://github.com/<votre-nom-d-utilisateur>/Homelab-Media-Server.git
-    cd Homelab-Media-Server
+    git clone https://github.com/<votre-nom-d-utilisateur>/Jellyserv2026.git
+    cd Jellyserv2026
     ```
 
 2.  **Naviguez vers le Dossier du Configurateur**

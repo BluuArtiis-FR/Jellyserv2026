@@ -1,10 +1,10 @@
 # =============================================================================
-# HOMELAB MEDIA SERVER - Version 5.0.0 PRODUCTION
+# JELLYSERV2026 - Version 5.1.0 PRODUCTION
 # =============================================================================
 # Architecture hybride avec profils Docker Compose
 # Inspiré de YunoHost pour la robustesse et la facilité d'utilisation
 #
-# Documentation: https://github.com/BluuArtiis-FR/Homelab-Media-Server
+# Documentation: https://github.com/BluuArtiis-FR/Jellyserv2026
 # =============================================================================
 
 networks:

@@ -321,5 +321,5 @@ docker volume ls
 
 1. **Documentation:** [README.md](../README.md)
 2. **Guide Avance:** [GUIDE_AVANCE.md](./GUIDE_AVANCE.md)
-3. **Issues GitHub:** [Ouvrir une issue](https://github.com/BluuArtiis-FR/Homelab-Media-Server/issues)
+3. **Issues GitHub:** [Ouvrir une issue](https://github.com/BluuArtiis-FR/Jellyserv2026/issues)
 4. **Gemini CLI:** Utilisez le fichier `GEMINI.md` pour obtenir de l'aide contextuelle

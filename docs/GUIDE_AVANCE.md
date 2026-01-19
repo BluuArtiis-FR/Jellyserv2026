@@ -8,8 +8,8 @@ La première étape consiste à préparer votre machine hôte.
 
 ```bash
 # Clonez d'abord le projet
-git clone https://github.com/BluuArtiis-FR/Homelab-Media-Server.git
-cd Homelab-Media-Server
+git clone https://github.com/BluuArtiis-FR/Jellyserv2026.git
+cd Jellyserv2026
 
 # Lancez l'installation
 sudo make install
