@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/github/license/BluuArtiis-FR/Jellyserv2026?style=for-the-badge)](LICENSE)
 [![GitHub Pages](https://img.shields.io/github/deployments/BluuArtiis-FR/Jellyserv2026/github-pages?label=Configurateur&style=for-the-badge)](https://bluuartiis-fr.github.io/Jellyserv2026/)
 
-[Configurateur Web](https://bluuartiis-fr.github.io/Jellyserv2026/) | [Guide Avance](./docs/GUIDE_AVANCE.md) | [Troubleshooting](./docs/TROUBLESHOOTING.md)
+[Configurateur Web](https://bluuartiis-fr.github.io/Jellyserv2026/) | [Guide de Setup](./docs/SETUP_GUIDE.md) | [Guide Avance](./docs/GUIDE_AVANCE.md) | [Troubleshooting](./docs/TROUBLESHOOTING.md)
 
 </div>
 

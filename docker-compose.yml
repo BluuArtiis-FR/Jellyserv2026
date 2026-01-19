@@ -653,6 +653,8 @@ services:
       UN_RADARR_0_API_KEY: ${RADARR_API_KEY:-}
       UN_LIDARR_0_URL: http://lidarr:8686
       UN_LIDARR_0_API_KEY: ${LIDARR_API_KEY:-}
+      UN_READARR_0_URL: http://readarr:8787
+      UN_READARR_0_API_KEY: ${READARR_API_KEY:-}
     volumes:
       - ${DOWNLOADS_PATH}:/downloads
     networks:
@@ -2474,10 +2476,16 @@ services:
     user: ${PUID:-1000}:${PGID:-1000}
     environment:
       - TZ=${TZ:-Europe/Paris}
+      - SONARR_API_KEY=${SONARR_API_KEY:-}
+      - RADARR_API_KEY=${RADARR_API_KEY:-}
     volumes:
       - recyclarr_config:/config
+      - ${CONFIG_PATH:-./config}/recyclarr/recyclarr.yml:/config/recyclarr.yml:ro
     networks:
       - homelab
+    depends_on:
+      - sonarr
+      - radarr
     restart: unless-stopped
     logging: *default-logging
     deploy:

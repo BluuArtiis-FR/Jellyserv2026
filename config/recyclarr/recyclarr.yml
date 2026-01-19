@@ -1,0 +1,147 @@
+# =============================================================================
+# RECYCLARR - Configuration TRaSH Guides
+# =============================================================================
+# Documentation: https://recyclarr.dev/wiki/
+# TRaSH Guides: https://trash-guides.info/
+#
+# Cette configuration synchronise automatiquement les profils de qualite
+# recommandes par TRaSH Guides vers Sonarr et Radarr.
+# =============================================================================
+
+# Sonarr Configuration
+sonarr:
+  series:
+    base_url: http://sonarr:8989
+    api_key: !env_var SONARR_API_KEY
+
+    # Quality Definition - Resolutions et tailles recommandees
+    quality_definition:
+      type: series
+
+    # Custom Formats pour les series
+    custom_formats:
+      # HDR Formats
+      - trash_ids:
+          - 7878c33f1c5cd4a4f16520fd63c53305 # DV HDR10+
+          - 6d0d8de7b57e35518ac0308b0ddf404e # DV HDR10
+          - 1f733af03141f068a540eec352589a89 # DV HLG
+          - 27954b0a80b20f7f5f2d5e8f1e8f1c9e # DV SDR
+          - a3d82cbef5039f8d295478d28a887159 # HDR10+
+          - 3497799d29a085e2ac2df9d468413c94 # HDR10
+          - 3e2c4e748b64a1a1118e0ea3f4cf6875 # HDR
+          - bb019e1cd00f304f80971c965de064dc # HDR (undefined)
+          - 2a7e3be05d3861d6df7171ec74cad727 # PQ
+          - 17e889ce13117940092308f48b48b45b # HLG
+        quality_profiles:
+          - name: HD - 720p/1080p
+          - name: Ultra-HD
+
+      # Audio Formats
+      - trash_ids:
+          - 496f355514737f7d83bf7aa4d24f8169 # TrueHD Atmos
+          - 2f22d89048b01681dde8afe203bf2e95 # DTS X
+          - 417804f7f2c4308c1f4c5d380d4c4475 # ATMOS (undefined)
+          - 1af239278386be2919e1bcee0bde047e # DD+ Atmos
+          - 3cafb66171b47f226146a0770576870f # TrueHD
+          - dcf3ec6938fa32445f590a4da84256cd # DTS-HD MA
+          - a570d4a0e56a2874b64e5bfa55202a1b # FLAC
+          - e7c2fcae07cbada050a0af3357491d7b # PCM
+          - 8e109e50e0a0b83a5098b056e13bf6db # DTS-HD HRA
+          - 185f1dd7264c4562b9022d963ac37424 # DD+
+          - f9f847ac70a0af62ea4a08280b859636 # DTS-ES
+          - 1c1a4c5e823891c75bc50380a6866f73 # DTS
+          - 240770601cc226190c367ef59aba7463 # ACC
+          - c2998bd0d90ed5621d8df281e839436e # DD
+        quality_profiles:
+          - name: HD - 720p/1080p
+          - name: Ultra-HD
+
+      # Unwanted - Formats a eviter
+      - trash_ids:
+          - 85c61753df5da1fb2aab6f2a47426b09 # BR-DISK
+          - 9c11cd3f07101cdba90a2d81cf0e56b4 # LQ
+          - e2315f990da2e2cbfc9fa5b7a6fcfe48 # LQ (Release Title)
+          - 47435ece6b99a0b477caf360e79ba0bb # x265 (HD)
+          - fbcb31d8dabd2a319072b84fc0b7249c # Extras
+        quality_profiles:
+          - name: HD - 720p/1080p
+            score: -10000
+          - name: Ultra-HD
+            score: -10000
+
+# Radarr Configuration
+radarr:
+  movies:
+    base_url: http://radarr:7878
+    api_key: !env_var RADARR_API_KEY
+
+    # Quality Definition
+    quality_definition:
+      type: movie
+
+    # Custom Formats pour les films
+    custom_formats:
+      # HDR Formats
+      - trash_ids:
+          - e23edd2482476e595fb990b12e7c609c # DV HDR10+
+          - 58d6a88f13e2db7f5059c41047876f00 # DV HDR10
+          - 55d53828b9d81cbe20b02efd00aa0efd # DV HLG
+          - a3e19f8f627608af0211acd02bf89735 # DV SDR
+          - b974a6cd08c1066250f1f177d7aa1225 # HDR10+
+          - dfb86d5941bc9075d6af23b09c2aeecd # HDR10
+          - e61e28db95d22bedcadf030b8f156c96 # HDR
+          - 2a4d9069cc1fe3f8c4939388ebdfb6a6 # HDR (undefined)
+          - 08d6d8834ad9ec87b1dc7ec8148e7a1f # PQ
+          - 9364dd386c9b4a1100dde8264690c64a # HLG
+        quality_profiles:
+          - name: HD Bluray + WEB
+          - name: Ultra-HD
+
+      # Audio Formats
+      - trash_ids:
+          - 496f355514737f7d83bf7aa4d24f8169 # TrueHD Atmos
+          - 2f22d89048b01681dde8afe203bf2e95 # DTS X
+          - 417804f7f2c4308c1f4c5d380d4c4475 # ATMOS (undefined)
+          - 1af239278386be2919e1bcee0bde047e # DD+ Atmos
+          - 3cafb66171b47f226146a0770576870f # TrueHD
+          - dcf3ec6938fa32445f590a4da84256cd # DTS-HD MA
+          - a570d4a0e56a2874b64e5bfa55202a1b # FLAC
+          - e7c2fcae07cbada050a0af3357491d7b # PCM
+          - 8e109e50e0a0b83a5098b056e13bf6db # DTS-HD HRA
+          - 185f1dd7264c4562b9022d963ac37424 # DD+
+          - f9f847ac70a0af62ea4a08280b859636 # DTS-ES
+          - 1c1a4c5e823891c75bc50380a6866f73 # DTS
+          - 240770601cc226190c367ef59aba7463 # ACC
+          - c2998bd0d90ed5621d8df281e839436e # DD
+        quality_profiles:
+          - name: HD Bluray + WEB
+          - name: Ultra-HD
+
+      # Unwanted
+      - trash_ids:
+          - ed38b889b31be83fda192888e2286d83 # BR-DISK
+          - 90a6f9a284dff5103f6346090e6280c8 # LQ
+          - e204b80c87be9497a8a6eaff48f72905 # LQ (Release Title)
+          - dc98083864ea246d05a42df0d05f81cc # x265 (HD)
+          - 0a3f082873eb454bde444150b70253cc # Extras
+          - b8cd450cbfa689c0259a01d9e29ba3d6 # 3D
+        quality_profiles:
+          - name: HD Bluray + WEB
+            score: -10000
+          - name: Ultra-HD
+            score: -10000
+
+      # Movie Versions
+      - trash_ids:
+          - 0f12c086e289cf966fa5948eac571f44 # Hybrid
+          - 570bc9ebecd92723d2d21500f4be314c # Remaster
+          - eca37840c13c6ef2dd0262b141a5482f # 4K Remaster
+          - e0c07d59beb37348e975a930d5e50319 # Criterion Collection
+          - 9d27d9d2181838f76dee150882bdc58c # Masters of Cinema
+          - db9b4c4b53d312a3ca5f1378f6440fc9 # Vinegar Syndrome
+          - 957d0f44b592285f26449575e8b1167e # Special Edition
+          - eecf3a857724171f968a66cb5719e152 # IMAX
+          - 9f6cbff8cfe4ebbc1bde14c7b7bec0de # IMAX Enhanced
+        quality_profiles:
+          - name: HD Bluray + WEB
+          - name: Ultra-HD
