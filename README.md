@@ -1,6 +1,6 @@
 <div align="center">
 
-# Homelab-Media-Server v5.4.0
+# Homelab-Media-Server v5.5.0
 
 **Plateforme complete de deploiement de serveur multimedia personnel avec Docker**
 
@@ -17,7 +17,7 @@
 
 ## Fonctionnalites
 
-- **78 services Docker** pre-configures avec healthchecks et limites de ressources
+- **79 services Docker** pre-configures avec healthchecks et limites de ressources
 - **SSL automatique** via Traefik + Let's Encrypt
 - **SSO integre** avec Authentik pour tous vos services
 - **Homer Dashboard** comme portail d'accueil personnalisable

@@ -1,7 +1,7 @@
 // services.js
 // This file is the "manifest" of all services available in docker-compose.yml
 // It defines their group, dependencies, and specific configuration variables.
-// SYNCHRONIZED with docker-compose.yml v5.4.0 (78 services)
+// SYNCHRONIZED with docker-compose.yml v5.5.0 (79 services)
 
 // Helper function to create a standard secret variable definition
 const createSecret = (name, description, link_to = null) => ({
@@ -308,6 +308,15 @@ export const SERVICE_MANIFEST = {
     expose: true,
     subdomain: "maintainerr",
     port: 6246
+  },
+  "autoscan": {
+    group: "media",
+    name: "Autoscan",
+    description: "Déclenche automatiquement les scans de bibliothèques Jellyfin/Plex après téléchargement.",
+    doc_url: "https://github.com/Cloudbox/autoscan",
+    dependencies: ["jellyfin"],
+    internal: true,
+    port: 3030
   },
 
   // ===========================================================================

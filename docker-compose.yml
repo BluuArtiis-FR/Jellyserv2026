@@ -1,5 +1,5 @@
 # =============================================================================
-# JELLYSERV2026 - Version 5.4.0 PRODUCTION
+# JELLYSERV2026 - Version 5.5.0 PRODUCTION
 # =============================================================================
 # Architecture hybride avec profils Docker Compose
 # Inspiré de YunoHost pour la robustesse et la facilité d'utilisation
@@ -124,6 +124,7 @@ volumes:
   wizarr_data:
   maintainerr_data:
   cross_seed_config:
+  autoscan_config:
   # Notifications
   apprise_config:
   # Productivity
@@ -2605,6 +2606,34 @@ services:
         reservations:
           cpus: '0.1'
           memory: 128M
+
+  # Autoscan - Déclencheur de scans automatiques pour Jellyfin/Plex
+  autoscan:
+    image: ghcr.io/hotio/autoscan:latest
+    container_name: autoscan
+    profiles: ["media", "autoscan"]
+    environment:
+      <<: *common-env
+    volumes:
+      - autoscan_config:/config
+      - ${MEDIA_PATH:-./media}:/media:ro
+    networks:
+      - homelab
+    ports:
+      - "3030:3030"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3030/health"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
 
   # ===========================================================================
   # NOTIFICATIONS - Hub de notifications
