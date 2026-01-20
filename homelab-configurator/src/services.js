@@ -1,7 +1,7 @@
 // services.js
 // This file is the "manifest" of all services available in docker-compose.yml
 // It defines their group, dependencies, and specific configuration variables.
-// SYNCHRONIZED with docker-compose.yml v5.3.0 (73 services)
+// SYNCHRONIZED with docker-compose.yml v5.4.0 (78 services)
 
 // Helper function to create a standard secret variable definition
 const createSecret = (name, description, link_to = null) => ({
@@ -19,6 +19,7 @@ export const SERVICE_GROUPS = {
   "cloud": "☁️ Cloud Personnel & Fichiers",
   "office": "💼 Bureautique & Productivité",
   "docs": "📚 Documentation & Prise de Notes",
+  "productivity": "✅ Productivité & Gestion de Projets",
   "monitoring": "📊 Monitoring & Alertes",
   "management": "🛠️ Gestion de la Stack",
   "recipes": "🍲 Gestion de Recettes",
@@ -624,6 +625,61 @@ export const SERVICE_MANIFEST = {
     group: "utils",
     name: "Shlink DB",
     description: "Base de données PostgreSQL pour Shlink.",
+    internal: true
+  },
+  "apprise": {
+    group: "utils",
+    name: "Apprise",
+    description: "API de notifications universelle (80+ services: Discord, Telegram, Email...).",
+    doc_url: "https://github.com/caronc/apprise-api",
+    expose: true,
+    subdomain: "notify",
+    port: 8000
+  },
+
+  // ===========================================================================
+  // PRODUCTIVITY PROFILE - Gestion de projets et tâches
+  // ===========================================================================
+  "planka": {
+    group: "productivity",
+    name: "Planka",
+    description: "Tableau Kanban collaboratif (alternative à Trello).",
+    doc_url: "https://docs.planka.cloud",
+    dependencies: ["planka-db"],
+    expose: true,
+    subdomain: "kanban",
+    port: 1337,
+    env_vars: [
+      createSecret("PLANKA_SECRET_KEY", "Clé secrète pour Planka."),
+      createSecret("PLANKA_DB_PASS", "Mot de passe PostgreSQL pour Planka."),
+      { name: "PLANKA_ADMIN_EMAIL", description: "Email de l'administrateur.", type: "email", default: "admin@example.com" },
+      createSecret("PLANKA_ADMIN_PASSWORD", "Mot de passe admin Planka.")
+    ]
+  },
+  "planka-db": {
+    group: "productivity",
+    name: "Planka DB",
+    description: "Base de données PostgreSQL pour Planka.",
+    internal: true
+  },
+  "vikunja": {
+    group: "productivity",
+    name: "Vikunja",
+    description: "Gestionnaire de tâches et todo list (alternative à Todoist).",
+    doc_url: "https://vikunja.io/docs",
+    dependencies: ["vikunja-db"],
+    expose: true,
+    subdomain: "tasks",
+    port: 3456,
+    env_vars: [
+      createSecret("VIKUNJA_JWT_SECRET", "Clé secrète JWT pour Vikunja."),
+      createSecret("VIKUNJA_DB_PASS", "Mot de passe PostgreSQL pour Vikunja.")
+    ]
+  },
+  "vikunja-db": {
+    group: "productivity",
+    name: "Vikunja DB",
+    description: "Base de données PostgreSQL pour Vikunja.",
     internal: true
   },
 

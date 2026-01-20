@@ -1,5 +1,5 @@
 # =============================================================================
-# JELLYSERV2026 - Version 5.3.0 PRODUCTION
+# JELLYSERV2026 - Version 5.4.0 PRODUCTION
 # =============================================================================
 # Architecture hybride avec profils Docker Compose
 # Inspiré de YunoHost pour la robustesse et la facilité d'utilisation
@@ -124,6 +124,13 @@ volumes:
   wizarr_data:
   maintainerr_data:
   cross_seed_config:
+  # Notifications
+  apprise_config:
+  # Productivity
+  planka_data:
+  planka_db_data:
+  vikunja_data:
+  vikunja_db_data:
   # Backup
   backup_data:
   # Portal
@@ -2598,6 +2605,183 @@ services:
         reservations:
           cpus: '0.1'
           memory: 128M
+
+  # ===========================================================================
+  # NOTIFICATIONS - Hub de notifications
+  # ===========================================================================
+
+  # Apprise - API de notifications universelle
+  apprise:
+    image: caronc/apprise:latest
+    container_name: apprise
+    profiles: ["utils", "apprise"]
+    environment:
+      <<: *common-env
+      APPRISE_STATELESS_URLS: ${APPRISE_STATELESS_URLS:-}
+    volumes:
+      - apprise_config:/config
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.apprise.rule=Host(`notify.${DOMAIN}`)"
+      - "traefik.http.routers.apprise.entrypoints=websecure"
+      - "traefik.http.routers.apprise.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.apprise.middlewares=authentik@docker"
+      - "traefik.http.services.apprise.loadbalancer.server.port=8000"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/status"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+
+  # ===========================================================================
+  # PRODUCTIVITY - Gestion de projets et tâches
+  # ===========================================================================
+
+  # Planka - Kanban board (clone Trello)
+  planka:
+    image: ghcr.io/plankanban/planka:latest
+    container_name: planka
+    profiles: ["productivity", "planka"]
+    environment:
+      - TZ=${TZ:-Europe/Paris}
+      - BASE_URL=https://kanban.${DOMAIN}
+      - DATABASE_URL=postgresql://planka:${PLANKA_DB_PASS:-planka}@planka-db:5432/planka
+      - SECRET_KEY=${PLANKA_SECRET_KEY:-notsecretkey}
+      - DEFAULT_ADMIN_EMAIL=${PLANKA_ADMIN_EMAIL:-admin@example.com}
+      - DEFAULT_ADMIN_PASSWORD=${PLANKA_ADMIN_PASSWORD:-admin}
+      - DEFAULT_ADMIN_NAME=Admin
+      - DEFAULT_ADMIN_USERNAME=admin
+    volumes:
+      - planka_data:/app/public/user-avatars
+      - planka_data:/app/public/project-background-images
+      - planka_data:/app/private/attachments
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.planka.rule=Host(`kanban.${DOMAIN}`)"
+      - "traefik.http.routers.planka.entrypoints=websecure"
+      - "traefik.http.routers.planka.tls.certresolver=letsencrypt"
+      - "traefik.http.services.planka.loadbalancer.server.port=1337"
+    depends_on:
+      planka-db:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  planka-db:
+    image: postgres:15-alpine
+    container_name: planka-db
+    profiles: ["productivity", "planka"]
+    environment:
+      - POSTGRES_DB=planka
+      - POSTGRES_USER=planka
+      - POSTGRES_PASSWORD=${PLANKA_DB_PASS:-planka}
+    volumes:
+      - planka_db_data:/var/lib/postgresql/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U planka -d planka"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
+
+  # Vikunja - Todo list et gestion de tâches
+  vikunja:
+    image: vikunja/vikunja:latest
+    container_name: vikunja
+    profiles: ["productivity", "vikunja"]
+    environment:
+      - TZ=${TZ:-Europe/Paris}
+      - VIKUNJA_DATABASE_TYPE=postgres
+      - VIKUNJA_DATABASE_HOST=vikunja-db
+      - VIKUNJA_DATABASE_DATABASE=vikunja
+      - VIKUNJA_DATABASE_USER=vikunja
+      - VIKUNJA_DATABASE_PASSWORD=${VIKUNJA_DB_PASS:-vikunja}
+      - VIKUNJA_SERVICE_FRONTENDURL=https://tasks.${DOMAIN}
+      - VIKUNJA_SERVICE_JWTSECRET=${VIKUNJA_JWT_SECRET:-jwtsecret}
+    volumes:
+      - vikunja_data:/app/vikunja/files
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vikunja.rule=Host(`tasks.${DOMAIN}`)"
+      - "traefik.http.routers.vikunja.entrypoints=websecure"
+      - "traefik.http.routers.vikunja.tls.certresolver=letsencrypt"
+      - "traefik.http.services.vikunja.loadbalancer.server.port=3456"
+    depends_on:
+      vikunja-db:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3456/health"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  vikunja-db:
+    image: postgres:15-alpine
+    container_name: vikunja-db
+    profiles: ["productivity", "vikunja"]
+    environment:
+      - POSTGRES_DB=vikunja
+      - POSTGRES_USER=vikunja
+      - POSTGRES_PASSWORD=${VIKUNJA_DB_PASS:-vikunja}
+    volumes:
+      - vikunja_db_data:/var/lib/postgresql/data
+    networks:
+      - homelab
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vikunja -d vikunja"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
 
   # ===========================================================================
   # PORTAL - Dashboard d'accueil
