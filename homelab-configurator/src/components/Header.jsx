@@ -40,10 +40,10 @@ const Header = () => {
       name: 'Media Stack',
       icon: '🎬',
       services: [
-        'jellyfin', 'jellyseerr', 'requestrr', 'tdarr', 'jellystat',
+        'jellyfin', 'jellyseerr', 'requestrr', 'wizarr', 'maintainerr', 'tdarr', 'jellystat',
         'sonarr', 'radarr', 'lidarr', 'readarr', 'bazarr',
         'prowlarr', 'flaresolverr', 'qbittorrent', 'gluetun',
-        'unpackerr', 'recyclarr'
+        'unpackerr', 'recyclarr', 'cross-seed'
       ]
     },
     {

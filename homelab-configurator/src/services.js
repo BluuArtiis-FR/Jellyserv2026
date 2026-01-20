@@ -1,7 +1,7 @@
 // services.js
 // This file is the "manifest" of all services available in docker-compose.yml
 // It defines their group, dependencies, and specific configuration variables.
-// SYNCHRONIZED with docker-compose.yml v5.2.0 (70 services)
+// SYNCHRONIZED with docker-compose.yml v5.3.0 (73 services)
 
 // Helper function to create a standard secret variable definition
 const createSecret = (name, description, link_to = null) => ({
@@ -217,6 +217,15 @@ export const SERVICE_MANIFEST = {
     dependencies: ["sonarr", "radarr"],
     internal: true
   },
+  "cross-seed": {
+    group: "download",
+    name: "Cross-Seed",
+    description: "Cross-seeding automatique pour améliorer vos ratios sur les trackers.",
+    doc_url: "https://cross-seed.org",
+    dependencies: ["qbittorrent"],
+    internal: true,
+    port: 2468
+  },
 
   // ===========================================================================
   // MEDIA PROFILE - Streaming and media management
@@ -278,6 +287,26 @@ export const SERVICE_MANIFEST = {
     name: "Jellystat DB",
     description: "Base de données PostgreSQL pour Jellystat.",
     internal: true
+  },
+  "wizarr": {
+    group: "media",
+    name: "Wizarr",
+    description: "Gestion des invitations utilisateurs pour Jellyfin.",
+    doc_url: "https://github.com/Wizarrrr/wizarr",
+    dependencies: ["jellyfin"],
+    expose: true,
+    subdomain: "invite",
+    port: 5690
+  },
+  "maintainerr": {
+    group: "media",
+    name: "Maintainerr",
+    description: "Nettoyage automatique des médias non regardés de vos bibliothèques.",
+    doc_url: "https://github.com/jorenn92/Maintainerr",
+    dependencies: ["jellyfin", "sonarr", "radarr"],
+    expose: true,
+    subdomain: "maintainerr",
+    port: 6246
   },
 
   // ===========================================================================

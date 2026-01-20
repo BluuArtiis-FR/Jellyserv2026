@@ -1,5 +1,5 @@
 # =============================================================================
-# JELLYSERV2026 - Version 5.2.0 PRODUCTION
+# JELLYSERV2026 - Version 5.3.0 PRODUCTION
 # =============================================================================
 # Architecture hybride avec profils Docker Compose
 # Inspiré de YunoHost pour la robustesse et la facilité d'utilisation
@@ -121,6 +121,9 @@ volumes:
   uptime_kuma_data:
   # Media automation
   requestrr_config:
+  wizarr_data:
+  maintainerr_data:
+  cross_seed_config:
   # Backup
   backup_data:
   # Portal
@@ -2496,6 +2499,105 @@ services:
         reservations:
           cpus: '0.05'
           memory: 64M
+
+  # ===========================================================================
+  # MEDIA AUTOMATION - Gestion avancée
+  # ===========================================================================
+
+  # Wizarr - Gestion des invitations Jellyfin
+  wizarr:
+    image: ghcr.io/wizarrrr/wizarr:latest
+    container_name: wizarr
+    profiles: ["media", "wizarr"]
+    environment:
+      <<: *common-env
+      APP_URL: https://invite.${DOMAIN}
+    volumes:
+      - wizarr_data:/data/database
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.wizarr.rule=Host(`invite.${DOMAIN}`)"
+      - "traefik.http.routers.wizarr.entrypoints=websecure"
+      - "traefik.http.routers.wizarr.tls.certresolver=letsencrypt"
+      - "traefik.http.services.wizarr.loadbalancer.server.port=5690"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5690/api/health"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # Maintainerr - Nettoyage automatique des médias
+  maintainerr:
+    image: ghcr.io/jorenn92/maintainerr:latest
+    container_name: maintainerr
+    profiles: ["media", "maintainerr"]
+    environment:
+      <<: *common-env
+    volumes:
+      - maintainerr_data:/opt/data
+    networks:
+      - homelab
+      - traefik_public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.maintainerr.rule=Host(`maintainerr.${DOMAIN}`)"
+      - "traefik.http.routers.maintainerr.entrypoints=websecure"
+      - "traefik.http.routers.maintainerr.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.maintainerr.middlewares=authentik@docker"
+      - "traefik.http.services.maintainerr.loadbalancer.server.port=6246"
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6246/api/health"]
+      <<: *healthcheck-defaults
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  # Cross-Seed - Cross-seeding automatique
+  cross-seed:
+    image: ghcr.io/cross-seed/cross-seed:latest
+    container_name: cross-seed
+    profiles: ["download", "cross-seed"]
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      - TZ=${TZ:-Europe/Paris}
+    volumes:
+      - cross_seed_config:/config
+      - ${CONFIG_PATH:-./config}/cross-seed/config.js:/config/config.js:ro
+      - ${DOWNLOADS_PATH:-./downloads}:/downloads:ro
+      - ${DOWNLOADS_PATH:-./downloads}/cross-seed:/cross-seed
+    networks:
+      - homelab
+    ports:
+      - "2468:2468"
+    command: daemon
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
   # ===========================================================================
   # PORTAL - Dashboard d'accueil

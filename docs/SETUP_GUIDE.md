@@ -15,6 +15,9 @@ Ce guide vous accompagne dans la configuration de votre stack media apres le pre
 9. [Configuration de Jellyseerr](#configuration-de-jellyseerr)
 10. [Configuration de Recyclarr](#configuration-de-recyclarr)
 11. [Configuration de Requestrr](#configuration-de-requestrr)
+12. [Configuration de Wizarr](#configuration-de-wizarr)
+13. [Configuration de Maintainerr](#configuration-de-maintainerr)
+14. [Configuration de Cross-Seed](#configuration-de-cross-seed)
 
 ---
 
@@ -41,7 +44,10 @@ docker compose ps
 | Readarr | `https://readarr.DOMAIN` | A creer au premier acces |
 | Bazarr | `https://bazarr.DOMAIN` | A creer au premier acces |
 | Jellyfin | `https://jellyfin.DOMAIN` | Assistant de configuration |
+| Wizarr | `https://invite.DOMAIN` | A creer au premier acces |
+| Maintainerr | `https://maintainerr.DOMAIN` | A creer au premier acces |
 | qBittorrent | `http://localhost:8080` | admin / adminadmin |
+| Cross-Seed | `http://localhost:2468` | Voir config.js |
 
 ---
 
@@ -371,6 +377,133 @@ Sur Discord, vos utilisateurs peuvent:
 
 ---
 
+## Configuration de Wizarr
+
+Wizarr simplifie l'invitation d'utilisateurs a votre serveur Jellyfin.
+
+### 1. Configuration Initiale
+
+1. Accedez a `https://invite.DOMAIN`
+2. Creez un compte administrateur
+3. Connectez Jellyfin:
+   - **Server URL**: `http://jellyfin:8096`
+   - **API Key**: Creez une cle API dans Jellyfin > Dashboard > API Keys
+
+### 2. Creer des Invitations
+
+1. Allez dans **Invitations**
+2. Cliquez sur **Create Invitation**
+3. Configurez:
+   - **Uses**: Nombre d'utilisations (1 pour invitation unique)
+   - **Expiry**: Duree de validite
+   - **Libraries**: Bibliotheques accessibles
+4. Partagez le lien genere avec vos invites
+
+### 3. Fonctionnalites
+
+- Onboarding automatique des nouveaux utilisateurs
+- Personnalisation du message de bienvenue
+- Gestion des bibliotheques par invitation
+- Expiration automatique des liens
+
+---
+
+## Configuration de Maintainerr
+
+Maintainerr nettoie automatiquement vos bibliotheques des medias non regardes.
+
+### 1. Connecter les Services
+
+1. Accedez a `https://maintainerr.DOMAIN`
+2. Allez dans **Settings > Connections**
+3. Ajoutez Jellyfin:
+   - **URL**: `http://jellyfin:8096`
+   - **API Key**: Votre cle API Jellyfin
+4. Ajoutez Sonarr (optionnel):
+   - **URL**: `http://sonarr:8989`
+   - **API Key**: Votre cle API Sonarr
+5. Ajoutez Radarr (optionnel):
+   - **URL**: `http://radarr:7878`
+   - **API Key**: Votre cle API Radarr
+
+### 2. Creer des Regles
+
+1. Allez dans **Rules**
+2. Cliquez sur **Add Rule**
+3. Exemples de regles:
+   - **Films non regardes depuis 6 mois**
+   - **Series terminees sans visionnage**
+   - **Medias avec mauvaise note**
+4. Configurez l'action: **Delete** ou **Move to collection**
+
+### 3. Planification
+
+1. Allez dans **Settings > Scheduler**
+2. Configurez la frequence d'execution
+3. Activez les notifications (optionnel)
+
+---
+
+## Configuration de Cross-Seed
+
+Cross-Seed permet le cross-seeding automatique pour ameliorer vos ratios sur les trackers.
+
+### 1. Configuration du fichier config.js
+
+Editez `config/cross-seed/config.js`:
+
+```javascript
+module.exports = {
+  // Client torrent
+  qbittorrentUrl: "http://gluetun:8080",
+  action: "inject",
+
+  // Chemins
+  torrentDir: "/downloads",
+  outputDir: "/cross-seed",
+
+  // Indexeurs Torznab depuis Prowlarr
+  // Prowlarr > Settings > Apps > Show Indexer URLs
+  torznab: [
+    "http://prowlarr:9696/1/api?apikey=VOTRE_CLE_API",
+    "http://prowlarr:9696/2/api?apikey=VOTRE_CLE_API"
+  ],
+
+  // Delai entre recherches (respectez les indexeurs)
+  delay: 30,
+
+  // Port API
+  port: 2468,
+};
+```
+
+### 2. Obtenir les URLs Torznab
+
+1. Dans Prowlarr, allez dans **Settings > Apps**
+2. Cliquez sur votre indexeur
+3. Copiez l'URL Torznab complete
+4. Ajoutez-la dans le tableau `torznab` de config.js
+
+### 3. Utilisation
+
+Cross-Seed fonctionne en mode daemon et scanne automatiquement vos torrents.
+
+```bash
+# Voir les logs
+docker logs cross-seed
+
+# Forcer un scan
+docker exec cross-seed cross-seed search
+```
+
+### 4. Conseils
+
+- Commencez avec `action: "save"` pour tester sans injecter
+- Utilisez `matchMode: "safe"` pour eviter les faux positifs
+- Respectez les delais pour ne pas surcharger les indexeurs
+
+---
+
 ## Recapitulatif des URLs Internes
 
 Pour la communication entre services Docker, utilisez ces URLs:
@@ -386,6 +519,9 @@ Pour la communication entre services Docker, utilisez ces URLs:
 | Jellyfin | `http://jellyfin:8096` |
 | qBittorrent | `http://gluetun:8080` |
 | FlareSolverr | `http://flaresolverr:8191` |
+| Wizarr | `http://wizarr:5690` |
+| Maintainerr | `http://maintainerr:6246` |
+| Cross-Seed | `http://cross-seed:2468` |
 
 ---
 
@@ -399,7 +535,10 @@ Pour la communication entre services Docker, utilisez ces URLs:
 6. **Bazarr** - Connectez Sonarr/Radarr pour les sous-titres
 7. **Jellyfin** - Ajoutez vos bibliotheques
 8. **Jellyseerr** - Connectez Jellyfin et les *arr pour les demandes
-9. **Requestrr** - Configurez le bot Discord (optionnel)
+9. **Wizarr** - Configurez les invitations Jellyfin
+10. **Maintainerr** - Configurez les regles de nettoyage
+11. **Cross-Seed** - Configurez le cross-seeding (optionnel)
+12. **Requestrr** - Configurez le bot Discord (optionnel)
 
 ---
 
